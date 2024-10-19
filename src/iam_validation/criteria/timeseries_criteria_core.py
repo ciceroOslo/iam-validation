@@ -139,12 +139,23 @@ class TimeseriesRefCriterion(Criterion):
     only time or only regions).
 
     The `get_value` method must nevertheless return a single value for a given
-    pathway, i.e., a `pandas.Series` with only the levels `model` and
-    `scenario` in the index. To achieve this, the user must pass functions that
-    aggregate over regions and over time through the `region_agg` and `time_agg`
-    parameters of the `__init__` method.
+    pathway, i.e., a `pandas.Series` with only the levels `model` and `scenario`
+    in the index. To achieve this, the user must pass functions that aggregate
+    over regions and over time through the `region_agg` and `time_agg`
+    parameters of the `__init__` method. If they are not specified, the pandas
+    `mean` function is used by default, i.e., the value returned is the
+    arithmetic mean value of the comparison function taken over all years and
+    regions. In many cases, this is probably not what you want. This is not
+    really an issue If you mainly want to compare values for each single year
+    using the `.compare` method, or do your own aggregation using the output
+    from `.compare`. In this case, you do not really need to worry about the
+    behavior of the `.get_value` method. But if you do intend to use the
+    `.get_value` method, or to use other classes that require calling the
+    `.get_value` method of a Criterion instance, you should specify more
+    appropriate aggregation functions through the `region_agg` and `time_agg`
+    parameters of the `__init__` method yourself.
 
-    Note that unlike the `pathways-ensemble-analysis.Criterion` base class,
+    Note that unlike the `pathways_ensemble_analysis.Criterion` base class,
     this class is intended to be able to check data for multiple regions at
     once, and the `__init__` method therefore does not take a `region`
     parameter. Please filter unwanted regions out of both the reference data
@@ -203,10 +214,11 @@ class TimeseriesRefCriterion(Criterion):
         `SeriesGroupBy` class. If it takes arguments, it should be a 2- or 
         3-tuple of the form `(func, args, kwargs)`, where `func` is a callable
         or string, or an `AggFuncTuple` object (defined in this module).
+        Optional, by default `"mean"`.
     time_agg : AggFuncTuple, tuple, callable or str
         The function to use to aggregate the timeseries over time before
         calling `self.get_values`. Must fulfill the same requirements as
-        `region_agg`.
+        `region_agg`. Optional, by default `"mean"`.
     agg_dim_order: AggDimOrder or str, optional
         Which order to apply aggregations in when calling `self.get_values`.
         Should be an `AggDimOrder` enum, or a string that is equal to one of
@@ -271,8 +283,8 @@ class TimeseriesRefCriterion(Criterion):
             comparison_function: tp.Callable[
                 [pyam.IamDataFrame, pyam.IamDataFrame], pd.Series
             ],
-            region_agg: AggFuncArg,
-            time_agg: AggFuncArg,
+            region_agg: AggFuncArg = 'mean',
+            time_agg: AggFuncArg = 'mean',
             agg_dim_order: AggDimOrder | str = AggDimOrder.REGION_FIRST,
             default_agg_dims: AggDims | str = AggDims.TIME_AND_REGION,
             broadcast_dims: Iterable[str] = (DIM.MODEL, DIM.SCENARIO),
