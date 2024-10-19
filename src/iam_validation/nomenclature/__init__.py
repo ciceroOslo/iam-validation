@@ -18,18 +18,4 @@ from .default_definitions import (
 )
 
 from . import validation
-from . import aggregation
 from . import mapping
-
-check_var_aggregates = functools.wraps(aggregation.check_var_aggregates)(
-    functools.partial(aggregation.check_var_aggregates, dsd=get_dsd())
-)
-
-check_region_aggregates = functools.wraps(aggregation.check_region_aggregates)(
-    functools.partial(
-        aggregation.check_region_aggregates,
-        dsd=get_dsd(),
-        processor=get_region_processor(),
-    )
-)
-    
