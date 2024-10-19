@@ -14,6 +14,7 @@ import dataclasses
 import functools
 import logging
 
+import numpy as np
 import pyam
 import pandas as pd
 from pandas.core.indexes.frozen import FrozenList
@@ -272,7 +273,7 @@ class TimeseriesRefCriterion(Criterion):
             reference: pyam.IamDataFrame,
             comparison_function: tp.Callable[
                 [pyam.IamDataFrame, pyam.IamDataFrame], pd.Series
-            ],
+            ] | tp.Literal['ratio', 'diff', 'absdiff'],
             default_agg_dims: AggDims | str = AggDims.NO_AGGREGATION,
             region_agg: AggFuncArg = 'mean',
             time_agg: AggFuncArg = 'mean',
@@ -286,7 +287,8 @@ class TimeseriesRefCriterion(Criterion):
         self.reference: pyam.IamDataFrame = reference
         self.comparison_function: Callable[
             [pyam.IamDataFrame, pyam.IamDataFrame], pd.Series
-        ] = comparison_function
+        ] = comparison_function if callable(comparison_function) \
+            else self._get_comparison_func_from_str(comparison_function)
         self._time_agg: AggFuncTuple = self._make_agg_func_tuple(time_agg)
         self._region_agg: AggFuncTuple = self._make_agg_func_tuple(region_agg)
         self.agg_dim_order: AggDimOrder = AggDimOrder(agg_dim_order)
@@ -307,6 +309,28 @@ class TimeseriesRefCriterion(Criterion):
             **kwargs
         )
     ###END def TimeseriesRefCriterion.__init__
+
+    def _get_comparison_func_from_str(
+            self, 
+            comparison_function: tp.Literal['ratio', 'diff', 'absdiff'],
+    ) -> Callable[[pyam.IamDataFrame, pyam.IamDataFrame], pd.Series]:
+        """Get a comparison function if specified as a string value."""
+        if comparison_function == 'ratio':
+            return get_ratio_comparison(
+                zero_by_zero_value=1.0,
+                div_by_zero_value=np.inf,
+            )
+        if comparison_function == 'diff':
+            return get_diff_comparison(
+                absolute=False,
+            )
+        if comparison_function == 'absdiff':
+            return get_diff_comparison(
+                absolute=True,
+            )
+        raise ValueError('`comparison_function` must be either "ratio" or '
+                         '"diff" or a callable.')
+    ###END def TimeSeriesRefCriterion._get_comparison_func_from_str
 
     def _make_agg_func_tuple(self, agg_func: AggFuncArg) -> AggFuncTuple:
         if isinstance(agg_func, AggFuncTuple):
