@@ -9,6 +9,8 @@ import functools
 # until the `nomenclature` code is changed, if ever.
 # from . import _region_adjustments
 
+from .. import type_helpers
+
 from .default_definitions import (
     dimensions,
     get_dsd,

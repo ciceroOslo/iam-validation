@@ -20,7 +20,8 @@ from . import (
     get_dsd,
     get_region_processor,
 )
-from .var_utils import not_none
+from . import type_helpers
+not_none = type_helpers.not_none
 
 
 
