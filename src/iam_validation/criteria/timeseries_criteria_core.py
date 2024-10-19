@@ -22,7 +22,7 @@ import pathways_ensemble_analysis as pea
 from pathways_ensemble_analysis.criteria.base import Criterion
 
 from .. import pyam_helpers
-from .dims import (
+from ..dims import (
     IamDimNames,
     DIM,
     UnknownDimensionNameError,
@@ -275,7 +275,7 @@ class TimeseriesRefCriterion(Criterion):
             time_agg: AggFuncArg,
             agg_dim_order: AggDimOrder | str = AggDimOrder.REGION_FIRST,
             default_agg_dims: AggDims | str = AggDims.TIME_AND_REGION,
-            broadcast_dims: Iterable[str] = ('model', 'scenario'),
+            broadcast_dims: Iterable[str] = (DIM.MODEL, DIM.SCENARIO),
             rating_function: Callable[[float], float] = lambda x: x,
             dim_names: IamDimNames = DIM,
             *args,
