@@ -57,8 +57,8 @@ merged_defs: MergedDefs = common_defs.update(project_defs)
 # or a `pathlib.Path` object.
 
 # %%
-results_file: Path|str = Path('.') / 'my_model_output.xlsx'
-model_df = pyam.IamDataFrame(results_file)
+model_file: Path|str = Path('.') / 'my_model_output.xlsx'
+model_df = pyam.IamDataFrame(model_file)
 
 
 # %% [markdown]
