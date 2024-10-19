@@ -22,6 +22,7 @@ from pandas.core.groupby import SeriesGroupBy
 import pathways_ensemble_analysis as pea
 from pathways_ensemble_analysis.criteria.base import Criterion
 
+from ..type_helpers import not_none
 from .. import pyam_helpers
 from ..dims import (
     IamDimNames,
@@ -388,9 +389,10 @@ class TimeseriesRefCriterion(Criterion):
     def compare(
             self,
             iamdf: pyam.IamDataFrame,
+            joint_only: tp.Optional[bool] = None,
             filter: tp.Optional[Mapping[str, tp.Any]] = None,
             join: tp.Literal['inner', 'outer', 'reference', 'input', None] \
-                = None,
+                = 'inner',
     ) -> pd.Series:
         """Return comparison values for the given `IamDataFrame`.
 
@@ -408,13 +410,21 @@ class TimeseriesRefCriterion(Criterion):
         ----------
         iamdf : pyam.IamDataFrame
             The `IamDataFrame` to get comparison values for.
+        joint_only : bool, optional
+            Whether to filter both `iamdf` and the refereence data to include
+            only coordinate values they have in common in the non-broadcast
+            dimensions. I.e., compare only values that are present in both
+            `iamdf` and in the reference data, rather than getting NA values in
+            non-overlappping coordinates. If this is True, `join` is ignored
+            (but `filter` is still applied before). The default is True.
         filter : Mapping[str, tp.Any], optional
             Filter to apply to the reference data `self.reference` before
             performing the comparison. Should be a dict that can be expanded
             (`**filter`) and passed to `self.reference.filter`.
         join : `"inner"`, `"outer"`, `"reference"`, `"input"` or `None`
             Whether and how to join the reference data and the input `iamdf`
-            before comparing. The operation acts similarly to a join or merge,
+            before comparing. *NB!*, this option is ignored unless `joint_only`
+            is set to False. The operation acts similarly to a join or merge,
             and is applied after broadcasting and filtering (if `filter` is
             specified) the reference data, but before comparing. If `join` is
             specified (i.e., not `None`), the output will in most cases have the
@@ -442,7 +452,11 @@ class TimeseriesRefCriterion(Criterion):
             of `self.reference` after broadcasting and filtering is meant. For
             `outer` and `inner`, the resulting index will usually be ordered in
             the same way as `iamdf`, though the internal sorting of
-            `pyam.IamDataFrame` may change this.
+            `pyam.IamDataFrame` may change this. Optional, by default `"inner"`,
+            which means that comparisons will only be made where non-broadcast
+            index values are present in both `iamdf` and `self.reference`. To
+            get no joining at all (keep both reference and input data indexes
+            as they are), use `join=None`.
 
         Returns
         -------
@@ -454,6 +468,26 @@ class TimeseriesRefCriterion(Criterion):
             reference = self.reference.filter(**filter)  # pyright: ignore[reportAssignmentType]
         else:
             reference = self.reference
+        if joint_only is None:
+            joint_only = True
+        if joint_only:
+            joint_coordinates: dict[str, list[str|int]] = \
+                {
+                    _dim: list(set(getattr(iamdf, _dim))
+                               & set(getattr(reference, _dim)))
+                    for _dim in set(reference.dimensions) \
+                        - set(self.broadcast_dims) - {DIM.UNIT}
+                }
+            reference = not_none(reference.filter(
+                **joint_coordinates,
+                keep=True,
+                inplace=False,
+            ))
+            iamdf = not_none(iamdf.filter(
+                **joint_coordinates,
+                keep=True,
+                inplace=False,
+            ))
         ref = pyam_helpers.broadcast_dims(reference, iamdf, self.broadcast_dims)
         if join is not None:
             _ref_data: pd.Series = \
@@ -494,8 +528,9 @@ class TimeseriesRefCriterion(Criterion):
             file: pyam.IamDataFrame,
             agg_dims: tp.Optional[AggDims] = None,
             filter: tp.Optional[Mapping[str, tp.Any]] = None,
+            joint_only: tp.Optional[bool] = None,
             join: tp.Literal['inner', 'outer', 'reference', 'input', None] \
-                = None,
+                = 'inner',
     ) -> pd.Series:
         """Return comparison values aggregated over region and time. This
         function calls `self.compare` but adds the option to aggregate over time
@@ -522,6 +557,10 @@ class TimeseriesRefCriterion(Criterion):
             A filter to apply to the `reference` timeseries before comparing
             the values of the `iamdf` timeseries. See the documentation of the
             `.compare` method for details.
+        joint_only : bool, optional
+            Whether to only join the `reference` and `iamdf` timeseries
+            together. See the documentation of the `.compare` method for
+            details.
         join : {'inner', 'outer', 'reference', 'input', None}, optional
             How to join the `reference` and `iamdf` timeseries. See the
             documentation of the `.compare` method for details.
@@ -533,15 +572,17 @@ class TimeseriesRefCriterion(Criterion):
         """
         if agg_dims is None:
             agg_dims = self.default_agg_dims
+        compared_data: pd.Series = \
+            self.compare(file, filter=filter, joint_only=joint_only, join=join)
         match agg_dims:
             case AggDims.TIME_AND_REGION:
-                return self.aggregate_time_and_region(self.compare(file))
+                return self.aggregate_time_and_region(compared_data)
             case AggDims.TIME:
-                return self._aggregate_time(self.compare(file))
+                return self._aggregate_time(compared_data)
             case AggDims.REGION:
-                return self._aggregate_region(self.compare(file))
+                return self._aggregate_region(compared_data)
             case AggDims.NO_AGGREGATION:
-                return self.compare(file)
+                return compared_data
             case _:
                 raise ValueError(f'Unknown agg_dims value {agg_dims}.')
     ###END def TimeseriesRefCriterion.get_values
