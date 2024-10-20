@@ -15,10 +15,10 @@ from ..targets.target_classes import (
     CriterionTargetRange,
     RelativeRange,
 )
-from ..pea_timeseries.timeseries_criteria_core import (
+from ..criteria.timeseries_criteria_core import (
     TimeseriesRefCriterion,
 )
-from ..pea_timeseries.dims import DIM
+from ..criteria.timeseries_criteria_core import DIM
 from .base import (
     CTCol,
     CriterionTargetRangeOutput,
