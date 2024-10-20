@@ -30,7 +30,11 @@ from .base import (
     WriterTypeVar,
     CriterionTargetRangeOutputStyles,
 )
-from .excel import MultiDataFrameExcelWriter
+from .excel import (
+    ExcelFileSpec,
+    MultiDataFrameExcelWriter,
+    ExcelWriterBase,
+)
 from ..type_helpers import not_none
 
 
@@ -742,5 +746,52 @@ class TimeseriesRefTargetOutput(
             writer=writer,
         )
     ###END def IamCompactTimeseriesRefComparisonOutput.__init__
+
+    def to_excel(
+            self,
+            file: ExcelFileSpec | pd.ExcelWriter | MultiDataFrameExcelWriter,
+            *,
+            results: dict[str, pd.DataFrame] | dict[str, PandasStyler],
+            force_valid_sheet_name: bool = True,
+    ) -> None:
+        """
+        Writes the output to an Excel file.
+
+        Parameters
+        ----------
+        file : str, Path, BytesIO, pandas.ExcelWriter, or MultiDataFrameExcelWriter
+            Path or str specifying the Excel file to write to, or a pre-existing
+            `xlsxwriter.Workbook` or `pandas.ExcelWriter` object. Can also write
+            to an in-memory `BytesIO` object. If using a `pandas.ExcelWriter`
+            object, it must use `xlsxwriter` as its engine. Can also use an
+            already instantiated `excel.MultiDataFrameExcelWriter` object. Note
+            that if `file` is a `MultiDataFrameExcelWriter` or
+            `pandas.ExcelWriter` object, it will not be closed after writing.
+            The caller is responsible for closing it, and content will most
+            likely not be written to disk before that is done.
+        results : dict[str, pd.DataFrame], optional
+            The dict returned by `prepare_output` (for unstyled Excel output)
+            or `prepare_styled_output` (for styled Excel output).
+        force_valid_sheet_name : bool, optional
+            Whether to modify the keys of the `data` dict passed to `write` to
+            be valid Excel sheet names, using the `make_valid_excel_sheetname`
+            function. Optional, defaults to True.
+        """
+        if isinstance(
+                file,
+                (pd.ExcelWriter, MultiDataFrameExcelWriter,ExcelWriterBase)
+        ):
+            close_file: bool = False
+        else:
+            close_file = True
+        if not isinstance(file, MultiDataFrameExcelWriter):
+            file = MultiDataFrameExcelWriter(
+                file=file,
+                force_valid_sheet_name=force_valid_sheet_name,
+            )
+        super().write_output(results, writer=file)
+        if close_file:
+            file.close()
+    ###END def IamCompactTimeseriesRefComparisonOutput.to_excel
 
 ###END class IamCompactTimeseriesRefComparisonOutput

@@ -40,4 +40,4 @@ ratios_styled_dfs: dict[str, Styler] = ratios_outputter.prepare_styled_output(mo
 # produced in the previous step).
 
 # %%
-ratios_outputter.to_excel('comparison.xlsx')
+ratios_outputter.to_excel('comparison.xlsx', results=ratios_styled_dfs)
