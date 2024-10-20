@@ -17,7 +17,7 @@ from pandas.io.formats.style import Styler
 
 
 # %% [markdown]
-# Create an outputter object that can produced styled output, and use it to get
+# Create an outputter object that can produce styled output, and use it to get
 # formatted DataFrames. The returned DataFrames will have colored highlights for
 # the ratios that fall outside the allowed range.
 #
@@ -30,14 +30,15 @@ from pandas.io.formats.style import Styler
 
 # %%
 ratios_outputter = TimeseriesRefTargetOutput(target_range)
-ratios_styled_dfs: dict[str, Styler] = ratios_outputter.prepare_styled_output(model_df)
+ratios_styled_dfs: dict[str, Styler] \
+    = ratios_outputter.prepare_styled_output(model_df)
 
 
 # %% [markdown]
 # Write the output to an Excel file, which will have colored cells for
-# deviations outside the range. The option `with_summary=True` will produces two
-# worksheets, one with summmary and one with full comparison (mirroring the dict
-# produced in the previous step).
+# deviations outside the range. The file will have two worksheets, one with
+# summary and one with full comparison (mirroring the dict produced in the
+# previous step).
 
 # %%
 ratios_outputter.to_excel('comparison.xlsx', results=ratios_styled_dfs)
