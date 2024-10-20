@@ -31,6 +31,7 @@ from .base import (
     CriterionTargetRangeOutputStyles,
 )
 from .excel import MultiDataFrameExcelWriter
+from ..type_helpers import not_none
 
 
 TimeseriesRefCriterionTypeVar = tp.TypeVar(
@@ -180,12 +181,12 @@ class TimeseriesRefComparisonAndTargetOutput(
     def __init__(
             self,
             *,
-            criteria: TimeseriesRefCriterionTypeVar,
+            criteria: tp.Optional[TimeseriesRefCriterionTypeVar] = None,
             target_range: tp.Optional[
                 Callable[
                     [TimeseriesRefCriterionTypeVar],
                     CriterionTargetRangeTypeVar
-                ]
+                ] | CriterionTargetRangeTypeVar
             ] = None,
             target_range_type: tp.Optional[
                 tp.Type[CriterionTargetRangeTypeVar]
@@ -220,24 +221,31 @@ class TimeseriesRefComparisonAndTargetOutput(
 
         Parameters
         ----------
-        criteria : TimeseriesRefCriterion
-            The criterion to be used to prepare the output data.
-        target_range : callable, optional
-            A function that takes the `TimeseriesRefCriterion` instance passed
-            through the `criteria` parameter and returns a
-            `CriterionTargetRange` or subclass instance. See the docstring of
-            `CriterionTargetRangeOutput` for details. Optional. If not given, an
-            instance of the type given by `target_range_type` is
-            constructed using the target, range and optionally `distance_func`
-            parameters passed through the `target`, `range` and `distance_func`
-            parameters. To access other parameters of the `CriterionTargetRange`
-            init method, use a partial function of `CriterionTargetRange` as the
-            `target_range` parameter, or pass a lambda that calls
-            `CriterionTargetRange` with the parameters set to the desired
-            values. If `target_range` is not set, the parameters
-            `target_range_type`, `target` and `range` must be set.
-            Subclasses can define a default for `target_range_type` by
-            setting the class attribute `target_range_default_type`.
+        criteria : TimeseriesRefCriterion, optional
+            The criterion to be used to prepare the output data. Can be omitted
+            if `target_range` is a `CriterionTargetRange` or subclass instance
+            that contains the desired `Criterion` as its `criterion` attribute.
+        target_range : CriterionTargetRange or callable, optional
+            A `CriterionTargetRange` or subclass instance that will be used to
+            prepare the output data, and contains the desired criterion, target
+            value and target range, or a callable that produces such an instance
+            using the `criteria`, `target`, `range` and `distance_func`
+            parameters. If a `CriterionTargetRange` or subclass instance, those
+            parameters are all ignored. If a callable, it must take the
+            `TimeseriesRefCriterion` instance passed through the `criteria`
+            parameter and returns a `CriterionTargetRange` or subclass instance.
+            See the docstring of `CriterionTargetRangeOutput` for details.
+            Optional. If not given, an instance of the type given by
+            `target_range_type` is constructed using the target, range and
+            optionally `distance_func` parameters passed through the `target`,
+            `range` and `distance_func` parameters. To access other parameters
+            of the `CriterionTargetRange` init method, use a partial function of
+            `CriterionTargetRange` as the `target_range` parameter, or pass a
+            lambda that calls `CriterionTargetRange` with the parameters set to
+            the desired values. If `target_range` is not set, the parameters
+            `target_range_type`, `target` and `range` must be set. Subclasses
+            can define a default for `target_range_type` by setting the class
+            attribute `target_range_default_type`.
         target_range_type : type, optional
             The default type to use to construct a `CriterionTargetRange` or
             subclass instance if `target_range` is not set. Must be a subclass
@@ -317,31 +325,49 @@ class TimeseriesRefComparisonAndTargetOutput(
             returned by the `prepare_output` method. Optional. If not set, the
             default key "Summary metrics" is used.
         """
-        self.criteria: TimeseriesRefCriterionTypeVar = criteria
+        if criteria is not None:
+            if isinstance(target_range, CriterionTargetRange):
+                raise TypeError(
+                    '`target_range` should not be set to a '
+                    '`CriterionTargetRange` instance if `criteria` is provided.'
+                )
+            if target_range_type is None:
+                if hasattr(self, 'target_range_default_type'):
+                    target_range_type = self.target_range_default_type
+            self.target_range: CriterionTargetRangeTypeVar \
+                    = self._prepare_target_range(
+                target_range=target_range,
+                target_range_type=target_range_type,
+                criteria=criteria,
+                target=target,
+                range=range,
+                distance_func=distance_func,
+            )
+        elif not isinstance(target_range, CriterionTargetRange):
+            raise TypeError(
+                '`target_range` must be a `CriterionTargetRange` instance if '
+                '`criteria` is not provided.'
+            )
+        else:
+            if not isinstance(target_range.criterion, TimeseriesRefCriterion):
+                raise TypeError(
+                    '`target_range.criterion` must be a `TimeSeriesCriterion` '
+                    'instance.'
+                )
+            self.target_range = target_range
+            criteria = target_range.criterion
         self.writer = writer if writer is not None else NoWriter()
         super().__init__(
-            criteria=criteria,
+            criteria=not_none(criteria),
             writer=writer if writer is not None else NoWriter(),
             style=style,
         )
-        if target_range_type is None:
-            if hasattr(self, 'target_range_default_type'):
-                target_range_type = self.target_range_default_type
         if timeseries_output_type is None:
             if hasattr(self, 'timeseries_output_default_type'):
                 timeseries_output_type = self.timeseries_output_default_type
         if summary_output_type is None:
             if hasattr(self, 'summary_output_default_type'):
                 summary_output_type = self.summary_output_default_type
-        self.target_range: CriterionTargetRangeTypeVar \
-                = self._prepare_target_range(
-            target_range=target_range,
-            target_range_type=target_range_type,
-            criteria=criteria,
-            target=target,
-            range=range,
-            distance_func=distance_func,
-        )
         self.timeseries_output: TimeseriesOutputTypeVar = \
             self._prepare_timeseries_output(
                 timeseries_output=timeseries_output,
@@ -598,11 +624,12 @@ class TimeseriesRefTargetOutput(
     using a `TimeseriesRefCriterion` instance), with an optional summary. It
     subclasses and produces the same type of output as
     `TimeseriesRefComparisonAndTargetOutput`, but is less generic and has fewer
-    but less bewildering customization options. It only requires a
-    `TimeseriesRefCriterion` instance (containing the reference timeseries data)
-    and a `CriterionTargetRange` instance (which defines the target value and
-    range) for initialization. It sets fixed choices or sensible defaults for
-    all other options in the `TimeseriesRefComparisonAndTargetOutput` class.
+    but less bewildering customization options. For initialization, it only
+    requires a `CriterionTargetRange` instance, which must have been created
+    with a `TimeseriesRefCriterion` instance (containing the timeseries
+    reference data) passed to the `criterion` parameter of its `__init__`
+    method. It sets fixed choices or sensible defaults for all other options in
+    the `TimeseriesRefComparisonAndTargetOutput` class.
 
     Like `TimeseriesRefComparisonAndTargetOutput`, it returns output as a
     dict of `pandas.DataFrame` (one with the full timeseries comparison and
@@ -615,19 +642,8 @@ class TimeseriesRefTargetOutput(
 
     def __init__(
             self,
-            reference: pyam.IamDataFrame \
-                | TimeseriesRefCriterion,
-            criterion_name: tp.Optional[str] = None,
+            criterion_target: CriterionTargetRange,
             *,
-            comparison_function: tp.Optional[
-                Callable[[pyam.IamDataFrame, pyam.IamDataFrame], pd.Series]
-            ] = None,
-            range: tp.Optional[tuple[float, float]] = None,
-            target: tp.Optional[float] = None,
-            region_agg: tp.Optional[TimeseriesRefCriterion.AggFuncArg] = None,
-            time_agg: tp.Optional[TimeseriesRefCriterion.AggFuncArg] = None,
-            default_agg_dims: tp.Optional[AggDims] = None,
-            broadcast_dims: tp.Optional[tp.Iterable[str]] = None,
             full_comparison_key: tp.Optional[str] = None,
             summary_key: tp.Optional[str] = None,
             summary_columns: tp.Optional[Sequence[CTCol]] = None,
@@ -638,36 +654,11 @@ class TimeseriesRefTargetOutput(
         """
         Parameters
         ----------
-        reference : pyam.IamDataFrame | IamCompactHarmonizationRatioCriterion
-            IamDataFrame of harmonized data values to compare against. Can also
-            be an IamCompactHarmonizationRatioCriterion instance that contains
-            the desired reference values, in which case the parameters
-            `criterion_name`, `comparison_function`, `region_agg`, `time_agg`,
-            `default_agg_dims`, and `broadcast_dims` will all be ignored if
-            given.
-        criterion_name : str, optional
-            A name to identify the criterion, if an existing criterion is not
-            given through `reference`. Is required if `reference` is None.
-        comparison_function, region_agg, time_agg, default_agg_dims, broadcast_dims
-            Passed to the `IamCompactHarmonizationRatioCriterion` init method
-            together with `reference`(if `reference` is not already an
-            `IamCompactHarmonizationRatioCriterion` instance, in which case
-            these parameters are all ignored). See the documentation of
-            `IamCompactHarmonizationRatioCriterion` and `TimeseriesRefCriterion`
-            for how these parameters are used.
-        target : float, optional
-            Target value for what the return value from `comparison_function`
-            should be when comparing the reference and the data to be vetted.
-            When `comparison_function` is None, it defaults to taking the ratio
-            of the data to be vetted to the reference values. In that case,
-            1.0 is usually the most suitable value for `target`, which is
-            therefore also the default value when not specified.
-        range : tuple[float, float], optional
-            Range of acceptable values for the return value from
-            `comparison_function`. Optional. If not specified, it defaults to
-            `(1.0-default_tol, 1.0+default_tol)`, where `default_tol` is equal
-            to `IAMCOMPACT_HARMONIZATION_DEFAULT_TOLERANCE`, which is usually
-            0.02, i.e., that a deviation of +/- 2% is acceptable.
+        criterion_target : CriterionTargetRange
+            A CriterionTargetRange instance that will be used to produce the
+            output comparison values. Must have been initialized with a
+            `TimeseriesRefCriterion` instance as its `criterion` parameter,
+            which must contain the timeseries reference data.
         full_comparison_key : str, optional
             The key to use for the `DataFrame` with the full comparison values
             (output of `comparison_function` for all points in all
@@ -694,23 +685,31 @@ class TimeseriesRefTargetOutput(
             Optional, defaults to `{CTCol.INRANGE: "In range",
             CTCol.VALUE: "Comparison values"}`.
         """
-        if isinstance(reference, IamCompactHarmonizationRatioCriterion):
-            criterion: IamCompactHarmonizationRatioCriterion = reference
-        else:
-            if criterion_name is None:
-                raise ValueError(
-                    'criterion_name must be given if reference is not an '
-                    'IamCompactHarmonizationRatioCriterion instance'
-                )
-            criterion = IamCompactHarmonizationRatioCriterion(
-                criterion_name=criterion_name,
-                reference=reference,
-                comparison_function=comparison_function,
-                region_agg=region_agg,
-                time_agg=time_agg,
-                default_agg_dims=default_agg_dims,
-                broadcast_dims=broadcast_dims,
-            )
+        # if isinstance(reference, IamCompactHarmonizationRatioCriterion):
+        #     criterion: IamCompactHarmonizationRatioCriterion = reference
+        # else:
+        #     if criterion_name is None:
+        #         raise ValueError(
+        #             'criterion_name must be given if reference is not an '
+        #             'IamCompactHarmonizationRatioCriterion instance'
+        #         )
+        #     criterion = IamCompactHarmonizationRatioCriterion(
+        #         criterion_name=criterion_name,
+        #         reference=reference,
+        #         comparison_function=comparison_function,
+        #         region_agg=region_agg,
+        #         time_agg=time_agg,
+        #         default_agg_dims=default_agg_dims,
+        #         broadcast_dims=broadcast_dims,
+        #     )
+        if not isinstance(criterion_target.criterion, TimeseriesRefCriterion):
+            raise ValueError(
+            '`criterion_target` must have been initialized with a '
+            '`TimeseriesRefCriterion` instance as its `criterion` parameter. '
+            '`criterion_target.criterion` instead is of type '
+            f'{type(criterion_target.criterion)}.'
+        )
+        criterion: TimeseriesRefCriterion = criterion_target.criterion
         if summary_key is None:
             summary_key = 'Summary'
         if full_comparison_key is None:
@@ -724,22 +723,23 @@ class TimeseriesRefTargetOutput(
                 CTCol.INRANGE: 'In range',
                 CTCol.VALUE: 'Comparison values',
             }
-        def _make_summary_output_obj(
-                _target_range: IamCompactHarmonizationTarget,
-        ) -> CriterionTargetRangeOutput:
-            return CriterionTargetRangeOutput(
-                criteria=_target_range,
-                writer=writer,
-                columns=summary_columns,
-                column_titles=summary_column_titles
-            )
+        # def _make_summary_output_obj(
+        #         _target_range: IamCompactHarmonizationTarget,
+        # ) -> CriterionTargetRangeOutput:
+        #     return CriterionTargetRangeOutput(
+        #         criteria=_target_range,
+        #         writer=writer,
+        #         columns=summary_columns,
+        #         column_titles=summary_column_titles
+        #     )
         super().__init__(
             criteria=criterion,
             target_range_type=IamCompactHarmonizationTarget,
             target=target,
             range=range,
             timeseries_output_type=TimeseriesRefFullComparisonOutput,
-            summary_output=_make_summary_output_obj,
+            # summary_output=_make_summary_output_obj,
+            summary_output_type=CriterionTargetRangeOutput,
             full_comparison_key=full_comparison_key,
             summary_key=summary_key,
             style=style,
