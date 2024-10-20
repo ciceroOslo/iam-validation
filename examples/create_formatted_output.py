@@ -10,17 +10,19 @@
 
 # %%
 from iam_validation.output import TimeseriesRefTargetOutput
-from .compare_timeseries_ref_data import target_range, model_df
+from compare_timeseries_ref_data import target_range, model_df
 
 import pandas as pd
+from pandas.io.formats.style import Styler
 
 
 # %% [markdown]
 # Create an outputter object that can produced styled output, and use it to get
-# a formatted DataFrame. The returned DataFrame will have colored highlights for
+# formatted DataFrames. The returned DataFrames will have colored highlights for
 # the ratios that fall outside the allowed range.
 #
-# Using `with_summary=True` gives us a dict with two elements:
+# The `.prepare_styled_output` method of `TimeseriesRefTargetOutput` gives us a
+# dict with two elements:
 # - `"summary"`: A pandas DataFrame with the maximum deviation per variable,
 #   model, scenario and region.
 # - `"full_comparison"`: A wide DataFrame with the ratios for each variable,
@@ -28,8 +30,7 @@ import pandas as pd
 
 # %%
 ratios_outputter = TimeseriesRefTargetOutput(target_range)
-ratios_styled_dfs: dict[str, pd.DataFrame] \
-    = ratios_outputter.prepare_output(model_df, with_summary=True)
+ratios_styled_dfs: dict[str, Styler] = ratios_outputter.prepare_styled_output(model_df)
 
 
 # %% [markdown]
