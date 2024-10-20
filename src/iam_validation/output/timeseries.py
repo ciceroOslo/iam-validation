@@ -15,10 +15,10 @@ from ..targets.target_classes import (
     CriterionTargetRange,
     RelativeRange,
 )
-from ..pea_timeseries.timeseries_criteria_core import (
+from ..criteria.timeseries_criteria_core import (
     TimeseriesRefCriterion,
 )
-from ..pea_timeseries.dims import DIM
+from ..criteria.timeseries_criteria_core import DIM
 from .base import (
     CTCol,
     CriterionTargetRangeOutput,
@@ -30,6 +30,12 @@ from .base import (
     WriterTypeVar,
     CriterionTargetRangeOutputStyles,
 )
+from .excel import (
+    ExcelFileSpec,
+    MultiDataFrameExcelWriter,
+    ExcelWriterBase,
+)
+from ..type_helpers import not_none
 
 
 TimeseriesRefCriterionTypeVar = tp.TypeVar(
@@ -179,12 +185,12 @@ class TimeseriesRefComparisonAndTargetOutput(
     def __init__(
             self,
             *,
-            criteria: TimeseriesRefCriterionTypeVar,
+            criteria: tp.Optional[TimeseriesRefCriterionTypeVar] = None,
             target_range: tp.Optional[
                 Callable[
                     [TimeseriesRefCriterionTypeVar],
                     CriterionTargetRangeTypeVar
-                ]
+                ] | CriterionTargetRangeTypeVar
             ] = None,
             target_range_type: tp.Optional[
                 tp.Type[CriterionTargetRangeTypeVar]
@@ -219,24 +225,31 @@ class TimeseriesRefComparisonAndTargetOutput(
 
         Parameters
         ----------
-        criteria : TimeseriesRefCriterion
-            The criterion to be used to prepare the output data.
-        target_range : callable, optional
-            A function that takes the `TimeseriesRefCriterion` instance passed
-            through the `criteria` parameter and returns a
-            `CriterionTargetRange` or subclass instance. See the docstring of
-            `CriterionTargetRangeOutput` for details. Optional. If not given, an
-            instance of the type given by `target_range_type` is
-            constructed using the target, range and optionally `distance_func`
-            parameters passed through the `target`, `range` and `distance_func`
-            parameters. To access other parameters of the `CriterionTargetRange`
-            init method, use a partial function of `CriterionTargetRange` as the
-            `target_range` parameter, or pass a lambda that calls
-            `CriterionTargetRange` with the parameters set to the desired
-            values. If `target_range` is not set, the parameters
-            `target_range_type`, `target` and `range` must be set.
-            Subclasses can define a default for `target_range_type` by
-            setting the class attribute `target_range_default_type`.
+        criteria : TimeseriesRefCriterion, optional
+            The criterion to be used to prepare the output data. Can be omitted
+            if `target_range` is a `CriterionTargetRange` or subclass instance
+            that contains the desired `Criterion` as its `criterion` attribute.
+        target_range : CriterionTargetRange or callable, optional
+            A `CriterionTargetRange` or subclass instance that will be used to
+            prepare the output data, and contains the desired criterion, target
+            value and target range, or a callable that produces such an instance
+            using the `criteria`, `target`, `range` and `distance_func`
+            parameters. If a `CriterionTargetRange` or subclass instance, those
+            parameters are all ignored. If a callable, it must take the
+            `TimeseriesRefCriterion` instance passed through the `criteria`
+            parameter and returns a `CriterionTargetRange` or subclass instance.
+            See the docstring of `CriterionTargetRangeOutput` for details.
+            Optional. If not given, an instance of the type given by
+            `target_range_type` is constructed using the target, range and
+            optionally `distance_func` parameters passed through the `target`,
+            `range` and `distance_func` parameters. To access other parameters
+            of the `CriterionTargetRange` init method, use a partial function of
+            `CriterionTargetRange` as the `target_range` parameter, or pass a
+            lambda that calls `CriterionTargetRange` with the parameters set to
+            the desired values. If `target_range` is not set, the parameters
+            `target_range_type`, `target` and `range` must be set. Subclasses
+            can define a default for `target_range_type` by setting the class
+            attribute `target_range_default_type`.
         target_range_type : type, optional
             The default type to use to construct a `CriterionTargetRange` or
             subclass instance if `target_range` is not set. Must be a subclass
@@ -316,31 +329,49 @@ class TimeseriesRefComparisonAndTargetOutput(
             returned by the `prepare_output` method. Optional. If not set, the
             default key "Summary metrics" is used.
         """
-        self.criteria: TimeseriesRefCriterionTypeVar = criteria
+        if criteria is not None:
+            if isinstance(target_range, CriterionTargetRange):
+                raise TypeError(
+                    '`target_range` should not be set to a '
+                    '`CriterionTargetRange` instance if `criteria` is provided.'
+                )
+            if target_range_type is None:
+                if hasattr(self, 'target_range_default_type'):
+                    target_range_type = self.target_range_default_type
+            self.target_range: CriterionTargetRangeTypeVar \
+                    = self._prepare_target_range(
+                target_range=target_range,
+                target_range_type=target_range_type,
+                criteria=criteria,
+                target=target,
+                range=range,
+                distance_func=distance_func,
+            )
+        elif not isinstance(target_range, CriterionTargetRange):
+            raise TypeError(
+                '`target_range` must be a `CriterionTargetRange` instance if '
+                '`criteria` is not provided.'
+            )
+        else:
+            if not isinstance(target_range.criterion, TimeseriesRefCriterion):
+                raise TypeError(
+                    '`target_range.criterion` must be a `TimeSeriesCriterion` '
+                    'instance.'
+                )
+            self.target_range = target_range
+            criteria = target_range.criterion
         self.writer = writer if writer is not None else NoWriter()
         super().__init__(
-            criteria=criteria,
+            criteria=not_none(criteria),
             writer=writer if writer is not None else NoWriter(),
             style=style,
         )
-        if target_range_type is None:
-            if hasattr(self, 'target_range_default_type'):
-                target_range_type = self.target_range_default_type
         if timeseries_output_type is None:
             if hasattr(self, 'timeseries_output_default_type'):
                 timeseries_output_type = self.timeseries_output_default_type
         if summary_output_type is None:
             if hasattr(self, 'summary_output_default_type'):
                 summary_output_type = self.summary_output_default_type
-        self.target_range: CriterionTargetRangeTypeVar \
-                = self._prepare_target_range(
-            target_range=target_range,
-            target_range_type=target_range_type,
-            criteria=criteria,
-            target=target,
-            range=range,
-            distance_func=distance_func,
-        )
         self.timeseries_output: TimeseriesOutputTypeVar = \
             self._prepare_timeseries_output(
                 timeseries_output=timeseries_output,
@@ -578,3 +609,189 @@ class TimeseriesRefComparisonAndTargetOutput(
     ###END def TimeSeriesRefComparisonAndTargetOutput.is_above_range
 
 ###END class TimeseriesRefComparisonAndTargetOutput
+
+
+class TimeseriesRefTargetOutput(
+    TimeseriesRefComparisonAndTargetOutput[
+        TimeseriesRefCriterion,
+        CriterionTargetRange,
+        TimeseriesRefFullComparisonOutput,
+        CriterionTargetRangeOutput,
+        MultiDataFrameExcelWriter | NoWriter,
+        None,
+        CriterionTargetRangeOutputStyles
+    ]
+):
+    """Less generic, friendlier `TimeseriesRefComparisonAndTargetOutput`.
+
+    This class produces output from a timeseries reference data comparison (done
+    using a `TimeseriesRefCriterion` instance), with an optional summary. It
+    subclasses and produces the same type of output as
+    `TimeseriesRefComparisonAndTargetOutput`, but is less generic and has fewer
+    but less bewildering customization options. For initialization, it only
+    requires a `CriterionTargetRange` instance, which must have been created
+    with a `TimeseriesRefCriterion` instance (containing the timeseries
+    reference data) passed to the `criterion` parameter of its `__init__`
+    method. It sets fixed choices or sensible defaults for all other options in
+    the `TimeseriesRefComparisonAndTargetOutput` class.
+
+    Like `TimeseriesRefComparisonAndTargetOutput`, it returns output as a
+    dict of `pandas.DataFrame` (one with the full timeseries comparison and
+    one with a summary). The summary can optionally be skipped using the
+    `with_summary` parameter to `self.prepare_output`.
+
+    In addition, the class supports writing output directly to Excel with a
+    `self.to_excel` method.
+    """
+
+    def __init__(
+            self,
+            criterion_target: CriterionTargetRange,
+            *,
+            full_comparison_key: tp.Optional[str] = None,
+            summary_key: tp.Optional[str] = None,
+            summary_columns: tp.Optional[Sequence[CTCol]] = None,
+            summary_column_titles: tp.Optional[Mapping[CTCol, str]] = None,
+            style: tp.Optional[CriterionTargetRangeOutputStyles] = None,
+            writer: tp.Optional[MultiDataFrameExcelWriter|NoWriter] = None,
+    ) -> None:
+        """
+        Parameters
+        ----------
+        criterion_target : CriterionTargetRange
+            A CriterionTargetRange instance that will be used to produce the
+            output comparison values. Must have been initialized with a
+            `TimeseriesRefCriterion` instance as its `criterion` parameter,
+            which must contain the timeseries reference data.
+        full_comparison_key : str, optional
+            The key to use for the `DataFrame` with the full comparison values
+            (output of `comparison_function` for all points in all
+            non-aggregated dimensions) in the dict returned by `prepare_output`
+            and `prepare_styled_output`. When writing to Excel with
+            `MultiDataFrameExcelWriter`, this will also be used as the
+            corresponding worksheet name. Optional, defaults to `"Full
+            comparison"`.
+        summary_key : str, optional
+            The key to use for the `DataFrame` with the summary values in the
+            dict returned by `prepare_output` and `prepare_styled_output`. When
+            writing to Excel with `MultiDataFrameExcelWriter`, this will also
+            be used as the corresponding worksheet name. Optional, defaults to
+            `"Summary"`.
+        summary_columns : Sequence[CTCol], optional
+            The columns to use for the summary values in the summary DataFrame
+            in the dict returned by `prepare_output` and
+            `prepare_styled_output`. Optional, defaults to `[CTCol.INRANGE,
+            CTCol.VALUE]`, i.e., a column with in-range/out-of-range boolean
+            values, a column with aggregated return values from
+            `comparison_function` and a column with the
+        summary_column_titles : Mapping[CTCol, str], optional
+            The titles to use for the summary columns in the summary DataFrame.
+            Optional, defaults to `{CTCol.INRANGE: "In range",
+            CTCol.VALUE: "Comparison values"}`.
+        """
+        # if isinstance(reference, IamCompactHarmonizationRatioCriterion):
+        #     criterion: IamCompactHarmonizationRatioCriterion = reference
+        # else:
+        #     if criterion_name is None:
+        #         raise ValueError(
+        #             'criterion_name must be given if reference is not an '
+        #             'IamCompactHarmonizationRatioCriterion instance'
+        #         )
+        #     criterion = IamCompactHarmonizationRatioCriterion(
+        #         criterion_name=criterion_name,
+        #         reference=reference,
+        #         comparison_function=comparison_function,
+        #         region_agg=region_agg,
+        #         time_agg=time_agg,
+        #         default_agg_dims=default_agg_dims,
+        #         broadcast_dims=broadcast_dims,
+        #     )
+        if not isinstance(criterion_target.criterion, TimeseriesRefCriterion):
+            raise ValueError(
+            '`criterion_target` must have been initialized with a '
+            '`TimeseriesRefCriterion` instance as its `criterion` parameter. '
+            '`criterion_target.criterion` instead is of type '
+            f'{type(criterion_target.criterion)}.'
+        )
+        if summary_key is None:
+            summary_key = 'Summary'
+        if full_comparison_key is None:
+            full_comparison_key = 'Full comparison'
+        if writer is None:
+            writer = NoWriter()
+        if summary_columns is None:
+            summary_columns = [CTCol.INRANGE, CTCol.VALUE]
+        if summary_column_titles is None:
+            summary_column_titles = {
+                CTCol.INRANGE: 'In range',
+                CTCol.VALUE: 'Comparison values',
+            }
+        # def _make_summary_output_obj(
+        #         _target_range: IamCompactHarmonizationTarget,
+        # ) -> CriterionTargetRangeOutput:
+        #     return CriterionTargetRangeOutput(
+        #         criteria=_target_range,
+        #         writer=writer,
+        #         columns=summary_columns,
+        #         column_titles=summary_column_titles
+        #     )
+        super().__init__(
+            target_range=criterion_target,
+            timeseries_output_type=TimeseriesRefFullComparisonOutput,
+            # summary_output=_make_summary_output_obj,
+            summary_output_type=CriterionTargetRangeOutput,
+            full_comparison_key=full_comparison_key,
+            summary_key=summary_key,
+            style=style,
+            writer=writer,
+        )
+    ###END def IamCompactTimeseriesRefComparisonOutput.__init__
+
+    def to_excel(
+            self,
+            file: ExcelFileSpec | pd.ExcelWriter | MultiDataFrameExcelWriter,
+            *,
+            results: dict[str, pd.DataFrame] | dict[str, PandasStyler],
+            force_valid_sheet_name: bool = True,
+    ) -> None:
+        """
+        Writes the output to an Excel file.
+
+        Parameters
+        ----------
+        file : str, Path, BytesIO, pandas.ExcelWriter, or MultiDataFrameExcelWriter
+            Path or str specifying the Excel file to write to, or a pre-existing
+            `xlsxwriter.Workbook` or `pandas.ExcelWriter` object. Can also write
+            to an in-memory `BytesIO` object. If using a `pandas.ExcelWriter`
+            object, it must use `xlsxwriter` as its engine. Can also use an
+            already instantiated `excel.MultiDataFrameExcelWriter` object. Note
+            that if `file` is a `MultiDataFrameExcelWriter` or
+            `pandas.ExcelWriter` object, it will not be closed after writing.
+            The caller is responsible for closing it, and content will most
+            likely not be written to disk before that is done.
+        results : dict[str, pd.DataFrame], optional
+            The dict returned by `prepare_output` (for unstyled Excel output)
+            or `prepare_styled_output` (for styled Excel output).
+        force_valid_sheet_name : bool, optional
+            Whether to modify the keys of the `data` dict passed to `write` to
+            be valid Excel sheet names, using the `make_valid_excel_sheetname`
+            function. Optional, defaults to True.
+        """
+        if isinstance(
+                file,
+                (pd.ExcelWriter, MultiDataFrameExcelWriter,ExcelWriterBase)
+        ):
+            close_file: bool = False
+        else:
+            close_file = True
+        if not isinstance(file, MultiDataFrameExcelWriter):
+            file = MultiDataFrameExcelWriter(
+                file=file,
+                force_valid_sheet_name=force_valid_sheet_name,
+            )
+        super().write_output(results, writer=file)
+        if close_file:
+            file.close()
+    ###END def IamCompactTimeseriesRefComparisonOutput.to_excel
+
+###END class IamCompactTimeseriesRefComparisonOutput

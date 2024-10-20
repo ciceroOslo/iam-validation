@@ -14,6 +14,7 @@ import dataclasses
 import functools
 import logging
 
+import numpy as np
 import pyam
 import pandas as pd
 from pandas.core.indexes.frozen import FrozenList
@@ -21,8 +22,9 @@ from pandas.core.groupby import SeriesGroupBy
 import pathways_ensemble_analysis as pea
 from pathways_ensemble_analysis.criteria.base import Criterion
 
+from ..type_helpers import not_none
 from .. import pyam_helpers
-from .dims import (
+from ..dims import (
     IamDimNames,
     DIM,
     UnknownDimensionNameError,
@@ -133,18 +135,16 @@ class TimeseriesRefCriterion(Criterion):
     reference timeseries. In addition to the method `get_value` that all
     `pea.Criterion` subclasses use to provide a single value for a given
     pathway, this class is designed to permit comparisons for all years and for
-    multiple regions simultaneously, and therefore provides a method
-    `compare` that can be used to get a fully disaggregated comparison (for each
-    year and available region) or a partially aggregated one (aggregated over
-    only time or only regions).
-
-    The `get_value` method must nevertheless return a single value for a given
-    pathway, i.e., a `pandas.Series` with only the levels `model` and
-    `scenario` in the index. To achieve this, the user must pass functions that
-    aggregate over regions and over time through the `region_agg` and `time_agg`
-    parameters of the `__init__` method.
-
-    Note that unlike the `pathways-ensemble-analysis.Criterion` base class,
+    multiple regions simultaneously. Unlike the `Criterion` subclasses in the
+    `pathways-ensemble-analysis` package, the `.get_values` method of this class
+    does therefore not by default select a year or region or compute an
+    over years or regions. If needed, the `.get_values` method accepts an
+    `agg_dims` parameter that can specify which if any of the dimensions `time`
+    and `region` should be aggregated over. A default value can be set for this
+    parameter through the `__init__` method, as well as what aggregation
+    functions should be used.
+    
+    Note that unlike the `pathways_ensemble_analysis.Criterion` base class,
     this class is intended to be able to check data for multiple regions at
     once, and the `__init__` method therefore does not take a `region`
     parameter. Please filter unwanted regions out of both the reference data
@@ -195,31 +195,34 @@ class TimeseriesRefCriterion(Criterion):
         differences, the units of the output will not be the same as the units
         of the inputs, and the user is responsible for ensuring that this is
         correctly reflected in the `unit` index level of the returned `Series`.
-    region_agg : AggFuncTuple, tuple, callable or str
-        The function to use to aggregate the timeseries over regions before
-        calling `self.get_values`. If the function does not need to take any
-        arguments, it should be either a callable that takes a `pandas.Series`
-        and returns a float, or a string that is a method name of the pandas
-        `SeriesGroupBy` class. If it takes arguments, it should be a 2- or 
-        3-tuple of the form `(func, args, kwargs)`, where `func` is a callable
-        or string, or an `AggFuncTuple` object (defined in this module).
-    time_agg : AggFuncTuple, tuple, callable or str
-        The function to use to aggregate the timeseries over time before
-        calling `self.get_values`. Must fulfill the same requirements as
-        `region_agg`.
-    agg_dim_order: AggDimOrder or str, optional
-        Which order to apply aggregations in when calling `self.get_values`.
-        Should be an `AggDimOrder` enum, or a string that is equal to one of
-        the enum values. Defaults to `AggDimOrder.REGION_FIRST`.
     default_agg_dims: AggDims or str, optional
         Which dimensions out of time and region to aggregate over by default
         when calling `self.get_values`. Should be an `AggDims` enum, or a string
         that is equal to one of the enum values. See the docstring of
-        `self.get_values` for valid options. Defaults to `"both"`
-        (i.e., `AggDims.TIME_AND_REGION`).
+        `self.get_values` for valid options. Defaults to `"none"`
+        (i.e., no aggregation over time or regions).
+    region_agg : AggFuncTuple, tuple, callable or str
+        The function to use to aggregate the timeseries over regions when
+        calling `self.get_values` if either its `agg_dims` parameter or the
+        `default_agg_dims` parameter of `self.__init__` includes `"region"`. If
+        the function does not need to take any arguments, it should be either a
+        callable that takes a `pandas.Series` and returns a float, or a string
+        that is a method name of the pandas `SeriesGroupBy` class. If it takes
+        arguments, it should be a 2- or 3-tuple of the form `(func, args,
+        kwargs)`, where `func` is a callable or string, or an `AggFuncTuple`
+        object (defined in this module). Optional, by default `"mean"`.
+    time_agg : AggFuncTuple, tuple, callable or str
+        The function to use to aggregate the timeseries over time if required
+        when calling `self.get_values`. Must fulfill the same requirements as
+        `region_agg`. Optional, by default `"mean"`.
+    agg_dim_order: AggDimOrder or str, optional
+        Which order to apply aggregations in when calling `self.get_values`, if
+        both time and region are to be aggregated over. Should be an
+        `AggDimOrder` enum, or a string that is equal to one of the enum values.
+        Defaults to `AggDimOrder.REGION_FIRST`.
     broadcast_dims : iterable of str, optional
-        The dimensions to broadcast over when comparing the timeseries. This
-        should be a subset of the dimensions of the `reference` timeseries.
+        The dimensions to broadcast over when comparing `reference` to data.
+        This should be a subset of the dimensions of the `reference` timeseries.
         `reference` should only have one value for each of these dimensions, or
         a `ValueError` will be raised. `reference` will be broadcast to the
         values of thsese dimensions in the `IamDataFrame` being comopared to
@@ -228,7 +231,8 @@ class TimeseriesRefCriterion(Criterion):
     rating_function : callable, optional
         The function to use to rate the comparison values. This function should
         take and return single numbers. Optional, by default equals the identity
-        function.
+        function. See the documentation of `pathways-ensemble-analysis` for more
+        on the intended use of rating functions.
     dim_names : dim.IamDimNames, optional
         The dimension names of the reference `IamDataFrame`s used for reference
         and to be vetted. Optional, defaults to `dims.DIM`
@@ -270,12 +274,12 @@ class TimeseriesRefCriterion(Criterion):
             reference: pyam.IamDataFrame,
             comparison_function: tp.Callable[
                 [pyam.IamDataFrame, pyam.IamDataFrame], pd.Series
-            ],
-            region_agg: AggFuncArg,
-            time_agg: AggFuncArg,
+            ] | tp.Literal['ratio', 'diff', 'absdiff'],
+            default_agg_dims: AggDims | str = AggDims.NO_AGGREGATION,
+            region_agg: AggFuncArg = 'mean',
+            time_agg: AggFuncArg = 'mean',
             agg_dim_order: AggDimOrder | str = AggDimOrder.REGION_FIRST,
-            default_agg_dims: AggDims | str = AggDims.TIME_AND_REGION,
-            broadcast_dims: Iterable[str] = ('model', 'scenario'),
+            broadcast_dims: Iterable[str] = (DIM.MODEL, DIM.SCENARIO),
             rating_function: Callable[[float], float] = lambda x: x,
             dim_names: IamDimNames = DIM,
             *args,
@@ -284,7 +288,8 @@ class TimeseriesRefCriterion(Criterion):
         self.reference: pyam.IamDataFrame = reference
         self.comparison_function: Callable[
             [pyam.IamDataFrame, pyam.IamDataFrame], pd.Series
-        ] = comparison_function
+        ] = comparison_function if callable(comparison_function) \
+            else self._get_comparison_func_from_str(comparison_function)
         self._time_agg: AggFuncTuple = self._make_agg_func_tuple(time_agg)
         self._region_agg: AggFuncTuple = self._make_agg_func_tuple(region_agg)
         self.agg_dim_order: AggDimOrder = AggDimOrder(agg_dim_order)
@@ -305,6 +310,28 @@ class TimeseriesRefCriterion(Criterion):
             **kwargs
         )
     ###END def TimeseriesRefCriterion.__init__
+
+    def _get_comparison_func_from_str(
+            self, 
+            comparison_function: tp.Literal['ratio', 'diff', 'absdiff'],
+    ) -> Callable[[pyam.IamDataFrame, pyam.IamDataFrame], pd.Series]:
+        """Get a comparison function if specified as a string value."""
+        if comparison_function == 'ratio':
+            return get_ratio_comparison(
+                zero_by_zero_value=1.0,
+                div_by_zero_value=np.inf,
+            )
+        if comparison_function == 'diff':
+            return get_diff_comparison(
+                absolute=False,
+            )
+        if comparison_function == 'absdiff':
+            return get_diff_comparison(
+                absolute=True,
+            )
+        raise ValueError('`comparison_function` must be either "ratio" or '
+                         '"diff" or a callable.')
+    ###END def TimeSeriesRefCriterion._get_comparison_func_from_str
 
     def _make_agg_func_tuple(self, agg_func: AggFuncArg) -> AggFuncTuple:
         if isinstance(agg_func, AggFuncTuple):
@@ -362,9 +389,10 @@ class TimeseriesRefCriterion(Criterion):
     def compare(
             self,
             iamdf: pyam.IamDataFrame,
+            joint_only: tp.Optional[bool] = None,
             filter: tp.Optional[Mapping[str, tp.Any]] = None,
             join: tp.Literal['inner', 'outer', 'reference', 'input', None] \
-                = None,
+                = 'inner',
     ) -> pd.Series:
         """Return comparison values for the given `IamDataFrame`.
 
@@ -382,13 +410,21 @@ class TimeseriesRefCriterion(Criterion):
         ----------
         iamdf : pyam.IamDataFrame
             The `IamDataFrame` to get comparison values for.
+        joint_only : bool, optional
+            Whether to filter both `iamdf` and the refereence data to include
+            only coordinate values they have in common in the non-broadcast
+            dimensions. I.e., compare only values that are present in both
+            `iamdf` and in the reference data, rather than getting NA values in
+            non-overlappping coordinates. If this is True, `join` is ignored
+            (but `filter` is still applied before). The default is True.
         filter : Mapping[str, tp.Any], optional
             Filter to apply to the reference data `self.reference` before
             performing the comparison. Should be a dict that can be expanded
             (`**filter`) and passed to `self.reference.filter`.
         join : `"inner"`, `"outer"`, `"reference"`, `"input"` or `None`
             Whether and how to join the reference data and the input `iamdf`
-            before comparing. The operation acts similarly to a join or merge,
+            before comparing. *NB!*, this option is ignored unless `joint_only`
+            is set to False. The operation acts similarly to a join or merge,
             and is applied after broadcasting and filtering (if `filter` is
             specified) the reference data, but before comparing. If `join` is
             specified (i.e., not `None`), the output will in most cases have the
@@ -416,7 +452,11 @@ class TimeseriesRefCriterion(Criterion):
             of `self.reference` after broadcasting and filtering is meant. For
             `outer` and `inner`, the resulting index will usually be ordered in
             the same way as `iamdf`, though the internal sorting of
-            `pyam.IamDataFrame` may change this.
+            `pyam.IamDataFrame` may change this. Optional, by default `"inner"`,
+            which means that comparisons will only be made where non-broadcast
+            index values are present in both `iamdf` and `self.reference`. To
+            get no joining at all (keep both reference and input data indexes
+            as they are), use `join=None`.
 
         Returns
         -------
@@ -428,6 +468,26 @@ class TimeseriesRefCriterion(Criterion):
             reference = self.reference.filter(**filter)  # pyright: ignore[reportAssignmentType]
         else:
             reference = self.reference
+        if joint_only is None:
+            joint_only = True
+        if joint_only:
+            joint_coordinates: dict[str, list[str|int]] = \
+                {
+                    _dim: list(set(getattr(iamdf, _dim))
+                               & set(getattr(reference, _dim)))
+                    for _dim in set(reference.dimensions) \
+                        - set(self.broadcast_dims) - {DIM.UNIT}
+                }
+            reference = not_none(reference.filter(
+                **joint_coordinates,
+                keep=True,
+                inplace=False,
+            ))
+            iamdf = not_none(iamdf.filter(
+                **joint_coordinates,
+                keep=True,
+                inplace=False,
+            ))
         ref = pyam_helpers.broadcast_dims(reference, iamdf, self.broadcast_dims)
         if join is not None:
             _ref_data: pd.Series = \
@@ -466,9 +526,15 @@ class TimeseriesRefCriterion(Criterion):
     def get_values(
             self,
             file: pyam.IamDataFrame,
-            agg_dims: tp.Optional[AggDims] = None
+            agg_dims: tp.Optional[AggDims] = None,
+            filter: tp.Optional[Mapping[str, tp.Any]] = None,
+            joint_only: tp.Optional[bool] = None,
+            join: tp.Literal['inner', 'outer', 'reference', 'input', None] \
+                = 'inner',
     ) -> pd.Series:
-        """Return comparison values aggregated over region and time.
+        """Return comparison values aggregated over region and time. This
+        function calls `self.compare` but adds the option to aggregate over time
+        and region, for compatibility with the superclass `get_values` method.
 
         Parameters
         ----------
@@ -487,6 +553,17 @@ class TimeseriesRefCriterion(Criterion):
             `get_values` method. Using other options may therefore result in
             unexpected behavior if used with other packages.  The `"none"`
             option is essentially the same as calling `.compare`.
+        filter : mapping, optional
+            A filter to apply to the `reference` timeseries before comparing
+            the values of the `iamdf` timeseries. See the documentation of the
+            `.compare` method for details.
+        joint_only : bool, optional
+            Whether to only join the `reference` and `iamdf` timeseries
+            together. See the documentation of the `.compare` method for
+            details.
+        join : {'inner', 'outer', 'reference', 'input', None}, optional
+            How to join the `reference` and `iamdf` timeseries. See the
+            documentation of the `.compare` method for details.
 
         Returns
         -------
@@ -495,15 +572,17 @@ class TimeseriesRefCriterion(Criterion):
         """
         if agg_dims is None:
             agg_dims = self.default_agg_dims
+        compared_data: pd.Series = \
+            self.compare(file, filter=filter, joint_only=joint_only, join=join)
         match agg_dims:
             case AggDims.TIME_AND_REGION:
-                return self.aggregate_time_and_region(self.compare(file))
+                return self.aggregate_time_and_region(compared_data)
             case AggDims.TIME:
-                return self._aggregate_time(self.compare(file))
+                return self._aggregate_time(compared_data)
             case AggDims.REGION:
-                return self._aggregate_region(self.compare(file))
+                return self._aggregate_region(compared_data)
             case AggDims.NO_AGGREGATION:
-                return self.compare(file)
+                return compared_data
             case _:
                 raise ValueError(f'Unknown agg_dims value {agg_dims}.')
     ###END def TimeseriesRefCriterion.get_values
