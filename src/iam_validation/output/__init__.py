@@ -15,3 +15,5 @@ Subpackages
 styling
     Modules and classes for styling output.
 """
+
+from .timeseries import TimeseriesRefTargetOutput

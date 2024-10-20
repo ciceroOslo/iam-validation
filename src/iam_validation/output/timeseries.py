@@ -609,8 +609,8 @@ class TimeseriesRefComparisonAndTargetOutput(
 
 class TimeseriesRefTargetOutput(
     TimeseriesRefComparisonAndTargetOutput[
-        IamCompactHarmonizationRatioCriterion,
-        IamCompactHarmonizationTarget,
+        TimeseriesRefCriterion,
+        CriterionTargetRange,
         TimeseriesRefFullComparisonOutput,
         CriterionTargetRangeOutput,
         MultiDataFrameExcelWriter | NoWriter,
@@ -709,7 +709,6 @@ class TimeseriesRefTargetOutput(
             '`criterion_target.criterion` instead is of type '
             f'{type(criterion_target.criterion)}.'
         )
-        criterion: TimeseriesRefCriterion = criterion_target.criterion
         if summary_key is None:
             summary_key = 'Summary'
         if full_comparison_key is None:
@@ -733,10 +732,7 @@ class TimeseriesRefTargetOutput(
         #         column_titles=summary_column_titles
         #     )
         super().__init__(
-            criteria=criterion,
-            target_range_type=IamCompactHarmonizationTarget,
-            target=target,
-            range=range,
+            target_range=criterion_target,
             timeseries_output_type=TimeseriesRefFullComparisonOutput,
             # summary_output=_make_summary_output_obj,
             summary_output_type=CriterionTargetRangeOutput,
