@@ -271,6 +271,16 @@ class CriterionTargetRange:
     def relative_range(self) -> RelativeRange|None:
         return self._relative_range
 
+    @property
+    def criterion(self) -> Criterion:
+        """The `Criterion` instance for the target.
+
+        *NB!* Note that the `Criterion` instance itself and its attributes are
+        not copied. You should not modify them unless you know wha you are
+        doing.
+        """
+        return self._criterion
+
     def _check_unit_specs(
             self,
             criterion: tp.Optional[Criterion] = None,
