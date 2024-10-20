@@ -21,7 +21,7 @@ import pyam
 
 
 # %% [markdown]
-# Load your reference timeseries data for one or more varaibles (e.g, data to be
+# Load your reference timeseries data for one or more variables (e.g, data to be
 # used for harmonization), which needs to be prepared in IAMC format and
 # loadable with `pyam`. Replace `referenc_file` below with the path to your
 # reference timeseries data, as a string or `pathlib.Path` object.
@@ -32,7 +32,7 @@ ref_data = pyam.IamDataFrame(reference_file)
 
 
 # %% [markdown]
-# Create a timeseries reference object that compars model results to the
+# Create a timeseries reference object that compares model results to the
 # reference data by taking the ratio, and define an allowed target range of
 # +/- 5%. The `criterion_name` can be any string, bu should be recognizable (can
 # be used by output functions later). Comparisons are here made for each
