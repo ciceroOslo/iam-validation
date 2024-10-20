@@ -6,6 +6,10 @@
 #
 # The model output must be in a file that can be read into a `pyam.IamDataFrame`
 # object by the `pyam` package, i.e., an Excel or CSV file in IAMC format.
+#
+# NB! At the time of writing, this example is not fully functional (as of
+# 2024-10-20). A few things in the `.nomenclature` subpackage still need to be
+# refactored.
 
 # %% [markdown]
 # Import required classes from the `iam_validation.nomenclature` package,
