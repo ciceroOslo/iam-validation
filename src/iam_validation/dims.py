@@ -1,6 +1,9 @@
 """Module for definitin dimension (column) names for IAM datasets."""
-from typing import NewType
 from dataclasses import dataclass
+from enum import EnumType
+from typing import NewType
+
+from nomenclature import config as nomenclature_config
 
 
 class IamDimName(str):
@@ -21,6 +24,8 @@ class IamDimNames:
 DIM: IamDimNames = IamDimNames()
 """`IamDimNames` instance with default dimension names IamDataFrames."""
 
+DsdDim: EnumType = nomenclature_config.DimensionEnum
+"""Dimension names that cen be present in a `DataStructureDefinition`."""
 
 class UnknownDimensionNameError(ValueError):
     """Exception raised when an unknown dimension name is encountered."""
