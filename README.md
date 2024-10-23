@@ -1,9 +1,11 @@
 # iam-validation
 Validation of names and values in IAMC-formatted model output against definitions and reference targets
 
-More will be added here during October 2024. Note that not all code will be functional
-until after the online poster presentation for this library at the 17th IAMC Annual Meeting
-(2024), on 2024-10-23.
+Documentation is currently sparse, but most classes and functions have ample docstrings. More proper
+documentation will be added soon.
+
+In the meantime, examples for the basic functionlity can be found in the
+[examples](/examples/) folder.
 
 
 ## Third-party code and licenses
