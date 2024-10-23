@@ -24,7 +24,7 @@ class IamDimNames:
 DIM: IamDimNames = IamDimNames()
 """`IamDimNames` instance with default dimension names IamDataFrames."""
 
-DsdDim: EnumType = nomenclature_config.DimensionEnum
+DsdDim = nomenclature_config.DimensionEnum
 """Dimension names that cen be present in a `DataStructureDefinition`."""
 
 class UnknownDimensionNameError(ValueError):
