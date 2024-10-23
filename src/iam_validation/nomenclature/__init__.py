@@ -11,11 +11,6 @@ import functools
 
 from .. import type_helpers
 
-from .default_definitions import (
-    dimensions,
-    get_dsd,
-    get_region_processor,
-)
-
-from . import validation
+from . import defs
 from . import mapping
+from . import validation
