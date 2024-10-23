@@ -16,6 +16,16 @@ from ..dims import DsdDim
 
 
 
+_DEFINITIONS_SUBDIR_NAME: str = "definitions"
+"""The subdirectory name for `DataStructureDefinition` definitions in
+nomenclature.
+"""
+_MAPPINGS_SUBDIR_NAME: str = "mappings"
+"""The subdirectory name for `RegionProcessor` region mappings in nomenclature.
+"""
+
+
+
 class NomenclatureDefs:
     """Class to load and use nomenclature definitinos and region mappings.
     
@@ -139,11 +149,11 @@ class NomenclatureDefs:
         with local_dir as local_dir_name:
             local_path: Path = Path(local_dir_name)
             dsd: DataStructureDefinition = DataStructureDefinition(
-                local_path / 'definitions', dimensions=dimensions
+                local_path / _DEFINITIONS_SUBDIR_NAME, dimensions=dimensions
             )
             if load_mappings:
                 region_processor = RegionProcessor.from_directory(
-                    path=local_path / 'mappings',
+                    path=local_path / _MAPPINGS_SUBDIR_NAME,
                     dsd=dsd
                 )
                 return cls(dsd=dsd, region_processor=region_processor)
@@ -259,8 +269,8 @@ class NomenclatureDefs:
                     'Was not able to create the temporary directory '
                     f'{temp_dir} for loading the repository.'
                 )
-            (temp_dir_path / 'definitions').mkdir()
-            (temp_dir_path / 'mappings').mkdir()
+            (temp_dir_path / _DEFINITIONS_SUBDIR_NAME).mkdir()
+            (temp_dir_path / _MAPPINGS_SUBDIR_NAME).mkdir()
             if config_content is not None:
                 config_path: Path = temp_dir_path / 'nomenclature.yaml'
                 config_path.write_text(config_content, encoding='utf-8')
