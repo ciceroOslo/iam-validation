@@ -332,6 +332,25 @@ class NomenclatureDefs:
             return invalid_names
     ###END def NOmenclatureDefs.get_invalid_names
 
+    def get_invalid_variable_units(self, df: pyam.IamDataFrame) \
+            -> pd.DataFrame | None:
+        """Returns a DataFrame of invalid variable/unit combos, and valid alternatives.
+        
+        Returns
+        -------
+        pandas.DataFrame or None
+            DataFrame with invalid and expected units for each variable in `df` that
+            has an invalid unit. The DataFrame has the variable names in the index,
+            and two columns that each contain strings or lists of strings. See
+            the documentation of `.validation.get_invalid_variable_units` for
+            details.
+            Returns None if there are no invalid variable/unit combinations were
+            found among known variables.
+        """
+        return validation.get_invalid_variable_units(df, dsd=self.dsd)
+    ###END def NomenclatureDefs.get_invalid_variable_units
+
+
 ###END class NomenclatureDefs
 
 
