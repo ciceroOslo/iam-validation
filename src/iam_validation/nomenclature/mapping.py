@@ -1,7 +1,7 @@
 """Functions for preforming region and variable mappings.
 
 The main functionality in this module is for performing mapping of model-native
-regions.
+regions. At the moment, variable mapping is not implemented yet.
 """
 from typing import (
     Literal,
@@ -15,10 +15,6 @@ from nomenclature import (
 )
 import pyam
 
-from . import (
-    get_dsd,
-    get_region_processor,
-)
 from .validation import get_invalid_model_regions
 from . import type_helpers
 not_none = type_helpers.not_none
@@ -30,24 +26,24 @@ def map_regions(
         iamdf: pyam.IamDataFrame,
         *,
         return_excluded: Literal[True],
-        dsd: Optional[DataStructureDefinition] = None,
-        region_processor: Optional[RegionProcessor] = None,
+        dsd: DataStructureDefinition,
+        region_processor: RegionProcessor,
 ) -> tuple[pyam.IamDataFrame, pyam.IamDataFrame]:
     ...
 @overload
 def map_regions(
         iamdf: pyam.IamDataFrame,
         *,
-        dsd: Optional[DataStructureDefinition] = None,
-        region_processor: Optional[RegionProcessor] = None,
-        return_excluded: Optional[bool] = None,
+        dsd: DataStructureDefinition,
+        region_processor: RegionProcessor,
+        return_excluded: Literal[False]|None = None,
 ) -> pyam.IamDataFrame:
     ...
 def map_regions(
         iamdf: pyam.IamDataFrame,
         *,
-        dsd: Optional[DataStructureDefinition] = None,
-        region_processor: Optional[RegionProcessor] = None,
+        dsd: DataStructureDefinition,
+        region_processor: RegionProcessor,
         return_excluded: Optional[bool] = None,
 ) -> pyam.IamDataFrame | tuple[pyam.IamDataFrame, pyam.IamDataFrame]:
     """Perform region mapping without crashing on invalid regions.
@@ -63,12 +59,10 @@ def map_regions(
     ----------
     iamdf : pyam.IamDataFrame
         The `IamDataFrame` to process.
-    dsd : DataStructureDefinition, optional
-        The `DataStructureDefinition` to validate against. Optional, will call
-        `iamcompact_nomenclature.get_dsd()` if not provided.
-    region_processor : nomenclature.RegionProcessor, optional
-        The `RegionProcessor` object to use for the mapping. If not provided,
-        `iamcompact_nomenclature.get_region_processor()` is used.
+    dsd : DataStructureDefinition
+        The `DataStructureDefinition` to validate against.
+    region_processor : nomenclature.RegionProcessor
+        The `RegionProcessor` object to use for the mapping.
     return_excluded : bool, optional
         Whether to return the part of the input that was excluded from
         processing. Optional, by default False.
