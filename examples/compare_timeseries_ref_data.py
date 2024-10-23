@@ -6,6 +6,10 @@
 # including detailed comparison for each data point (model, scenario, region, 
 # variable and year) that is present in both the model output and in the
 # reference data.
+#
+# At the bottom there is an extension example that shows how to produce
+# formatted output, in the form of styled pandas DataFrames and formatted Excel
+# files.
 
 # %% [markdown]
 # Import the required packages
@@ -76,3 +80,45 @@ comparison_ratios: pd.Series = timeseries_ref.get_values(model_df)
 # %%
 in_range_statuses: pd.Series = target_range.get_in_range(model_df)
 
+
+# %% [markdown]
+# # Create formatted output from criterion target comparisons
+#
+# This example shows how to use the `iam_validation.output` subpackage to create
+# formatted output from the comparisons above.
+
+# %% [markdown]
+# Imports for outputting
+
+# %%
+from iam_validation.output import TimeseriesRefTargetOutput
+
+from pandas.io.formats.style import Styler
+
+
+# %% [markdown]
+# Create an outputter object that can produce styled output, and use it to get
+# formatted DataFrames. The returned DataFrames will have colored highlights for
+# the ratios that fall outside the allowed range.
+#
+# The `.prepare_styled_output` method of `TimeseriesRefTargetOutput` gives us a
+# dict with two elements:
+# - `"summary"`: A pandas DataFrame with the maximum deviation per variable,
+#   model, scenario and region.
+# - `"full_comparison"`: A wide DataFrame with the ratios for each variable,
+#   model, scenario, region, and *year*.
+
+# %%
+ratios_outputter = TimeseriesRefTargetOutput(target_range)
+ratios_styled_dfs: dict[str, Styler] \
+    = ratios_outputter.prepare_styled_output(model_df)
+
+
+# %% [markdown]
+# Write the output to an Excel file, which will have colored cells for
+# deviations outside the range. The file will have two worksheets, one with
+# summary and one with full comparison (mirroring the dict produced in the
+# previous step).
+
+# %%
+ratios_outputter.to_excel('comparison.xlsx', results=ratios_styled_dfs)
