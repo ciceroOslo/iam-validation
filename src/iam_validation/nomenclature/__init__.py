@@ -8,7 +8,10 @@ from . import defs
 from . import mapping
 from . import validation
 
-from .defs import NomenclatureDefs
+from .defs import (
+    MergedDefs,
+    NomenclatureDefs,
+)
 
 
 

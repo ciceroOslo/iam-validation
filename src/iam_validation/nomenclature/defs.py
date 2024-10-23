@@ -9,10 +9,17 @@ from nomenclature import (
     DataStructureDefinition,
     RegionProcessor,
 )
+import pandas as pd
 import pyam
 import yaml
 
-from ..dims import DsdDim
+from ..dims import (
+    DIM,
+    DsdDim,
+)
+
+from . import multi_load
+from . import validation
 
 
 
@@ -280,4 +287,101 @@ class NomenclatureDefs:
         return temp_dir
     ###END def staticmethod NomenclatureDefs.make_tmp_load_dir
 
+    def update(self, other: tp.Self) -> "MergedDefs":
+        """Update this NomenclatureDefs with another NomenclatureDefs.
+        
+        Parameters
+        ----------
+        other : NomenclatureDefs
+            The NomenclatureDefs to merge with this one. Overlapping definitions
+            in `other` will override those in `self`.
+        """
+        return MergedDefs([other, self])
+    ###END def MergedDefs.update
+
+    def get_invalid_names(
+            self,
+            df: pyam.IamDataFrame,
+            dimensions: tp.Optional[Sequence[str]] = None,
+            raw_model_regions: bool = False,
+    ) -> dict[str, list[str]] | dict[str, list[str]|dict[str, list[str]]]:
+        """Returns a dictionary of invalid names for each dimension in a given
+        `IamDataFrame`.
+        """
+        if not raw_model_regions:
+            return validation.get_invalid_names(
+                df,
+                dsd=self.dsd,
+                dimensions=dimensions,
+            )
+        else:
+            invalid_names: dict[str, list[str]] | dict[str, list[str]|dict[str, list[str]]] \
+                = validation.get_invalid_names(
+                    df,
+                    dsd=self.dsd,
+                    dimensions=dimensions,
+                )
+            if str(DIM.REGION) in invalid_names:
+                invalid_names[str(DIM.REGION)] = \
+                    validation.get_invalid_model_regions(
+                        df,
+                        dsd=self.dsd,
+                        region_processor=self.region_processor,
+                        return_valid_native_combos=False,
+                    )
+            return invalid_names
+    ###END def NOmenclatureDefs.get_invalid_names
+
 ###END class NomenclatureDefs
+
+
+class MergedDefs(NomenclatureDefs):
+    """A merger of multiple NomenclatureDefs.
+    
+    Can be instantiated by passing a list of NomenclatureDefs, or by using the
+    `.update` method of the `NomenclatureDefs` class. If definitions overlap,
+    the ones that come earlier in the list will take precedence.
+    """
+
+    def __init__(
+            self,
+            defs_objects: Sequence[NomenclatureDefs],
+    ):
+        self.defs_objects: tp.Final[list[NomenclatureDefs]] = list(defs_objects)
+        merged_dsd = multi_load.MergedDataStructureDefinition(
+            [_defs.dsd for _defs in self.defs_objects]
+        )
+        # processor_dsd_pairs: list[tuple[DataStructureDefinition, RegionProcessor]] = [
+        #     (_defs.dsd, _defs.region_processor)
+        #     for _defs in self.defs_objects if hasattr(_defs, 'region_processor')
+        # ]
+        region_processors: list[RegionProcessor] = [
+            _defs.region_processor for _defs in self.defs_objects
+            if hasattr(_defs, 'region_processor')
+        ]
+        if len(region_processors) > 1:
+            merged_processor = multi_load.merge_region_processors(
+                region_processors,
+                merged_dsd=merged_dsd,
+            )
+            super().__init__(merged_dsd, region_processor=merged_processor)
+        elif len(region_processors) == 1:
+            super().__init__(merged_dsd, region_processor=region_processors[0])
+        else:
+            super().__init__(merged_dsd)
+    ###END def MergedDefs.__init__
+
+    @classmethod
+    def from_url(*args, **kwargs) -> tp.Self:
+        raise TypeError(
+            'MergedDefs cannot be instantiated using `.from_url()`. Please use '
+            'the main NomenclatureDefs class instead.'
+        )
+    ###END def MergedDefs.from_url
+
+    def update(self, other: NomenclatureDefs) -> tp.Self:
+        """Update this MergedDefs with another NomenclatureDefs."""
+        return type(self)([other, *self.defs_objects])
+    ###END def MergedDefs.update
+
+###END class MergedDefs
