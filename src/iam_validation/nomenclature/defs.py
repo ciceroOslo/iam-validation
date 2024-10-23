@@ -94,8 +94,8 @@ class NomenclatureDefs:
             cls,
             url: str,
             *,
-            dimensions: Sequence[DsdDim],
-            load_mappings: bool = True,
+            dimensions: Sequence[DsdDim|str],
+            region_mappings: bool = True,
             git_revision: tp.Optional[str] = None,
             git_hash: tp.Optional[str] = None,
     ) -> tp.Self:
@@ -139,7 +139,7 @@ class NomenclatureDefs:
             url,
             repo_id=_REPO_TEMP_ID,
             dimensions=dimensions,
-            load_mappings=load_mappings,
+            load_mappings=region_mappings,
             git_revision=git_revision,
             git_hash=git_hash,
         )
@@ -151,7 +151,7 @@ class NomenclatureDefs:
             dsd: DataStructureDefinition = DataStructureDefinition(
                 local_path / _DEFINITIONS_SUBDIR_NAME, dimensions=dimensions
             )
-            if load_mappings:
+            if region_mappings:
                 region_processor = RegionProcessor.from_directory(
                     path=local_path / _MAPPINGS_SUBDIR_NAME,
                     dsd=dsd
@@ -167,7 +167,7 @@ class NomenclatureDefs:
             url: str,
             *,
             repo_id: str,
-            dimensions: tp.Optional[Sequence[DsdDim]] = None,
+            dimensions: tp.Optional[Sequence[DsdDim|str]] = None,
             load_mappings: bool = True,
             git_revision: tp.Optional[str] = None,
             git_hash: tp.Optional[str] = None,

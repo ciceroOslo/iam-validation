@@ -17,7 +17,7 @@
 
 # %%
 from iam_validation.nomenclature import (
-    NomeclatureDefs,
+    NomenclatureDefs,
     MergedDefs,
     COMMON_DEFINITIONS_URL,
 )
@@ -34,14 +34,16 @@ import pyam
 # from our own project definitions instead.
 
 # %%
-common_defs = NomeclatureDefs.from_url(COMMON_DEFINITIONS_URL,
-                                       region_mappings=False)
+common_defs = NomenclatureDefs.from_url(COMMON_DEFINITIONS_URL,
+                                        dimensions=['variable', 'region'],
+                                        region_mappings=False)
 
 # %% [markdown]
 # Get project-specific names for all dimensions, and region-mappings from custom
 # project definitions
 
 # %%
+repo_url: str = 
 project_defs = NomenclatureDefs.from_url(
     repo_url,
     dimensions=['model', 'scenario', 'region', 'variable'],
