@@ -16,8 +16,9 @@ dependencies = [
     "pyam-iamc>=2.2",
     "pathways-ensemble-analysis @ git+https://gitlab.com/climateanalytics/pathways-ensemble-analysis.git@v1.1.0",
     "xlsxwriter>=3.2.0",
-	# Dependency required by p-e-a (but not listed among its requirements)
+    # Dependency required by p-e-a (but not listed among its requirements)
     "pandas-indexing>=0.5.2",
+    "pyyaml>=6.0.2",
 ]
 readme = "README.md"
 requires-python = ">= 3.11"

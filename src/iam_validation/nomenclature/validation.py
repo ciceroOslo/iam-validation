@@ -16,10 +16,7 @@ from nomenclature import (
 from nomenclature.code import VariableCode
 import pandas as pd
 
-from . import (
-    get_dsd,
-    get_region_processor,
-)
+from ..dims import DIM
 from . import type_helpers
 not_none = type_helpers.not_none
 
@@ -27,7 +24,7 @@ not_none = type_helpers.not_none
 
 def get_invalid_names(
         iamdf: pyam.IamDataFrame,
-        dsd: Optional[DataStructureDefinition] = None,
+        dsd: DataStructureDefinition,
         dimensions: Optional[Sequence[str]] = None
 ) -> dict[str, list[str]]:
     """Returns a dictionary of invalid names in a given `IamDataFrame`.
@@ -36,9 +33,8 @@ def get_invalid_names(
     ----------
     iamdf : pyam.IamDataFrame
         The `IamDataFrame` with model output to be validated.
-    dsd : DataStructureDefinition, optional
-        The `DataStructureDefinition` to validate against. Optional, will call
-        `iamcompact_nomenclature.get_dsd()` if not provided.
+    dsd : DataStructureDefinition
+        The `DataStructureDefinition` to validate against.
     dimensions : sequence of str, optional
         The dimensions to validate. Optional, defaults to the intersection of
         dimensions that are found in both `iamdf` and in `dsd`.
@@ -49,8 +45,6 @@ def get_invalid_names(
         A dictionary with the dimensions as keys and a list of invalid names
         found in each dimension as values.
     """
-    if dsd is None:
-        dsd = get_dsd()
     if dimensions is None:
         dimensions = [_dim for _dim in dsd.dimensions
                       if _dim in iamdf.dimensions]
@@ -67,25 +61,25 @@ def get_invalid_names(
 def get_invalid_model_regions(
         iamdf: pyam.IamDataFrame,
         *,
+        dsd: DataStructureDefinition,
+        region_processor: RegionProcessor,
         return_valid_native_combos: Literal[True],
-        dsd: Optional[DataStructureDefinition] = None,
-        region_processor: Optional[RegionProcessor] = None,
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     ...
 @overload
 def get_invalid_model_regions(
         iamdf: pyam.IamDataFrame,
         *,
-        dsd: Optional[DataStructureDefinition] = None,
-        region_processor: Optional[RegionProcessor] = None,
-        return_valid_native_combos: Optional[bool] = None,
+        dsd: DataStructureDefinition,
+        region_processor: RegionProcessor,
+        return_valid_native_combos: Literal[False]|None = None,
 ) -> dict[str, list[str]]:
     ...
 def get_invalid_model_regions(
         iamdf: pyam.IamDataFrame,
         *,
-        dsd: Optional[DataStructureDefinition] = None,
-        region_processor: Optional[RegionProcessor] = None,
+        dsd: DataStructureDefinition,
+        region_processor: RegionProcessor,
         return_valid_native_combos: Optional[bool] = None,
 ) -> dict[str, list[str]] | tuple[dict[str, list[str]], dict[str, list[str]]]:
     """Returns a dict of invalid region/model name combinations.
@@ -100,11 +94,9 @@ def get_invalid_model_regions(
     iamdf : pyam.IamDataFrame
         The `IamDataFrame` with data to check for region names.
     dsd : DataStructureDefinition, optional
-        The `DataStructureDefinition` to validate against. Optional, will call
-        `iamcompact_nomenclature.get_dsd()` if not provided.
+        The `DataStructureDefinition` to validate against.
     region_processor : nomenclature.RegionProcessor, optional
-        The `RegionProcessor` to use for finding model-native region names. If
-        not provided, will call `nomenclature.get_region_processor()`.
+        The `RegionProcessor` to use for finding model-native region names.
     return_valid_native_combos : bool, optional
         Whether to additionally return a dict of region names in `iamdf` that
         are not valid common region names, but which were found in combination
@@ -131,7 +123,7 @@ def get_invalid_model_regions(
         return_valid_native_combos = False
     if region_processor is None:
         region_processor = get_region_processor()
-    invalid_regions_common: list[str] = get_invalid_names(iamdf, dsd)['region']
+    invalid_regions_common: list[str] = get_invalid_names(iamdf, dsd)[DIM.REGION]
     check_native_iamdf: pyam.IamDataFrame = \
         not_none(iamdf.filter(region=invalid_regions_common))
     invalid_combos: dict[str, list[str]] = dict()
@@ -169,9 +161,10 @@ def get_invalid_model_regions(
 
 def get_invalid_variable_units(
         iamdf: pyam.IamDataFrame,
-        dsd: Optional[DataStructureDefinition] = None,
+        dsd: DataStructureDefinition,
+        *,
         raise_on_missing_var: bool = False,
-        variable_dimname: str = 'variable'
+        variable_dimname: str = DIM.VARIABLE,
 ) -> pd.DataFrame | None:
     """Gets all invalid variable/unit combinations in an `IamDataFrame`.
 
@@ -179,9 +172,8 @@ def get_invalid_variable_units(
     ----------
     iamdf : pyam.IamDataFrame
         IamDataFrame to validate
-    dsd : DataStructureDefinition, optional
-        The DataStructureDefinition to validate against. Optional, will call
-        `iamcompact_nomenclature.get_dsd()` if not provided.
+    dsd : DataStructureDefinition
+        The DataStructureDefinition to validate against.
     raise_on_missing_var : bool, optional
         If True, raise a KeyError if `iamdf` contains variables that are not
         defined in `dsd`. If False, ignore such variables. Optional, default:

@@ -17,11 +17,12 @@
 
 # %%
 from iam_validation.nomenclature import (
-    NomeclatureDefs,
+    NomenclatureDefs,
     MergedDefs,
     COMMON_DEFINITIONS_URL,
 )
 
+from collections.abc import Mapping
 from pathlib import Path
 
 import pandas as pd
@@ -34,14 +35,17 @@ import pyam
 # from our own project definitions instead.
 
 # %%
-common_defs = NomeclatureDefs.from_url(COMMON_DEFINITIONS_URL,
-                                       region_mappings=False)
+common_defs = NomenclatureDefs.from_url(COMMON_DEFINITIONS_URL,
+                                        dimensions=['variable', 'region'],
+                                        region_mappings=False)
 
 # %% [markdown]
 # Get project-specific names for all dimensions, and region-mappings from custom
 # project definitions
 
 # %%
+repo_url: str \
+    = 'https://github.com/ciceroOslo/iamcompact-nomenclature-definitions.git'
 project_defs = NomenclatureDefs.from_url(
     repo_url,
     dimensions=['model', 'scenario', 'region', 'variable'],
@@ -68,11 +72,11 @@ model_df = pyam.IamDataFrame(model_file)
 # %% [markdown]
 # Get invalid names, including recognized model-native ones. Returns a dict with
 # dimension names as keys, and invalid names for each dimension as a list, or
-# as a DataFrame of invlid model/region-name pairs when recognizing unammped
+# as a dict of invalid model/region-name pairs when recognizing unammped
 # model-native region names.
 
 # %%
-invalid_names: dict[str, list[str]|pd.DataFrame] = \
+invalid_names: Mapping[str, list[str]|dict[str, list[str]]] = \
     merged_defs.get_invalid_names(model_df, raw_model_regions=True)
 
 
@@ -83,4 +87,4 @@ invalid_names: dict[str, list[str]|pd.DataFrame] = \
 # valid unit names for that variable.
 
 # %%
-invalid_units: pd.DataFrame = merged_defs.get_invalid_variable_units(model_df)
+invalid_units: pd.DataFrame|None = merged_defs.get_invalid_variable_units(model_df)

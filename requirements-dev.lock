@@ -229,6 +229,7 @@ python-dotenv==1.0.1
 pytz==2024.2
     # via pandas
 pyyaml==6.0.2
+    # via iam-validation
     # via nomenclature-iamc
     # via pyam-iamc
     # via pysquirrel

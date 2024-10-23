@@ -191,7 +191,7 @@ class CriterionTargetRange:
         else:
             self.distance_func = self._default_distance_func
         self.description: str|None = description
-        self.rename_variable_column: str|bool = 'criterion' \
+        self.rename_variable_column: str|bool = False \
             if rename_variable_column is None else rename_variable_column
         if not isinstance(self.rename_variable_column, (str, bool)):
             raise TypeError(
