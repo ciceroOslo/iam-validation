@@ -66,11 +66,6 @@ model_df = pyam.IamDataFrame(model_file)
 # Get a pandas.Series with the ratios of model data relative reference data
 
 # %%
-# TODO: Consider whether to make `compare` return a `TargetComparison` instance
-# or something like that. Or perhaps make it cache results, or even remember the
-# last df that it was called on. Or just cache the results, but still require
-# user to pass in the desired IamDataFrame with model data each time, in order
-# to make explicit what data is being compared.
 comparison_ratios: pd.Series = timeseries_ref.get_values(model_df)
 
 
