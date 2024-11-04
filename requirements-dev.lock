@@ -131,7 +131,7 @@ mypy-extensions==1.0.0
     # via typing-inspect
 nest-asyncio==1.6.0
     # via ipykernel
-nomenclature-iamc @ git+https://github.com/ciceroOslo/nomenclature@9bb216ae915a3459f39b1a4622896d4183d36c88
+nomenclature-iamc==0.20.0
     # via iam-validation
 numpy==1.26.4
     # via contourpy
@@ -167,7 +167,7 @@ pandera==0.20.4
     # via ixmp4
 parso==0.8.4
     # via jedi
-pathways-ensemble-analysis @ git+https://gitlab.com/climateanalytics/pathways-ensemble-analysis.git@22e1165cb1b1f3e2e9a14b783f91165700502adf
+pathways-ensemble-analysis==1.0.0
     # via iam-validation
 pexpect==4.9.0
     # via ipython
@@ -192,7 +192,7 @@ ptyprocess==0.7.0
     # via pexpect
 pure-eval==0.2.3
     # via stack-data
-pyam-iamc==2.2.4
+pyam-iamc==2.3.0
     # via iam-validation
     # via nomenclature-iamc
 pycountry==23.12.11

@@ -92,7 +92,7 @@ mypy==1.12.0
 mypy-extensions==1.0.0
     # via mypy
     # via typing-inspect
-nomenclature-iamc @ git+https://github.com/ciceroOslo/nomenclature@9bb216ae915a3459f39b1a4622896d4183d36c88
+nomenclature-iamc==0.20.0
     # via iam-validation
 numpy==1.26.4
     # via contourpy
@@ -123,7 +123,7 @@ pandas-indexing==0.5.2
     # via iam-validation
 pandera==0.20.4
     # via ixmp4
-pathways-ensemble-analysis @ git+https://gitlab.com/climateanalytics/pathways-ensemble-analysis.git@22e1165cb1b1f3e2e9a14b783f91165700502adf
+pathways-ensemble-analysis==1.0.0
     # via iam-validation
 pillow==11.0.0
     # via matplotlib
@@ -134,7 +134,7 @@ psycopg==3.2.3
     # via ixmp4
 psycopg-binary==3.2.3
     # via psycopg
-pyam-iamc==2.2.4
+pyam-iamc==2.3.0
     # via iam-validation
     # via nomenclature-iamc
 pycountry==23.12.11

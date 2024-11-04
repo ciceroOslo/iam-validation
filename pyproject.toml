@@ -1,20 +1,14 @@
 [project]
 name = "iam-validation"
 version = "0.1.0"
-description = "Add your description here"
+description = "Validation of names and values in IAMC-formatted model output against definitions and reference targets"
 authors = [
     { name = "Jan Ivar Korsbakken", email = "janko@cicero.oslo.no" }
 ]
 dependencies = [
-    # We need a custom branch of nomenclature-iamc until it is merged and published as a new version,
-    # to avoid validation errors on region mappings with non-ASCII characters on Windows,
-    # and to get around a bug that caused dimensions other than `region` and `variable`
-    # not to be read from external repos. We can go back to using the standard packages
-    # when a version newer than 0.19.1 is released (a version that includes PR #415,
-    # which is commit 7913ff1 or newer).
-    "nomenclature-iamc @ git+https://github.com/ciceroOslo/nomenclature@fixes-for-iamcompact",
-    "pyam-iamc>=2.2",
-    "pathways-ensemble-analysis @ git+https://gitlab.com/climateanalytics/pathways-ensemble-analysis.git@v1.1.0",
+    "nomenclature-iamc>=0.20",
+    "pyam-iamc>=2.3",
+    "pathways-ensemble-analysis>=1.0",
     "xlsxwriter>=3.2.0",
     # Dependency required by p-e-a (but not listed among its requirements)
     "pandas-indexing>=0.5.2",
