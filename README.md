@@ -7,6 +7,9 @@ documentation will be added soon.
 In the meantime, examples for the basic functionlity can be found in the
 `examples` folder.
 
+An online poster describing the package was presented at the 17th IAMC Annual Meeting (2024).
+The poster is published at [https://doi.org/10.5281/zenodo.14015170](https://doi.org/10.5281/zenodo.14015170)
+
 
 ## Third-party code and licenses
 
