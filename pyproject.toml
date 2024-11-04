@@ -1,6 +1,6 @@
 [project]
 name = "iam-validation"
-version = "0.1.0"
+version = "0.1.1"
 description = "Validation of names and values in IAMC-formatted model output against definitions and reference targets"
 authors = [
     { name = "Jan Ivar Korsbakken", email = "janko@cicero.oslo.no" }
@@ -17,6 +17,10 @@ dependencies = [
 readme = "README.md"
 requires-python = ">= 3.11"
 license = { text = "Apache-2.0" }
+
+[project.urls]
+Repository = "https://github.com/ciceroOslo/iam-validation"
+Issues = "https://github.com/ciceroOslo/iam-validation/issues"
 
 [build-system]
 requires = ["hatchling"]
