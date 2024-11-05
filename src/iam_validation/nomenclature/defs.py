@@ -1,6 +1,7 @@
 """Module for loading nomenclature definitions and region mappings."""
 from collections.abc import Sequence
 import copy
+import enum
 from pathlib import Path
 import tempfile
 import typing as tp
@@ -31,6 +32,24 @@ _MAPPINGS_SUBDIR_NAME: str = "mappings"
 """The subdirectory name for `RegionProcessor` region mappings in nomenclature.
 """
 
+class TmpDirCleanup(enum.StrEnum):
+    """Whether and how to clean up temporary directories used to hold repos."""
+    IMMEDIATE = 'immediate'
+    """Clean up a temporary directory as soon as it has been used to load a
+    DataStructureDefinition, do not return it to the caller.
+    """
+    RETURN = 'return'
+    """Return the temporary directory to the caller, but let it be deleted when
+    Python exits.
+    """
+    KEEP_PERMANENTLY = 'keep_permanently'
+    """Return the temporary directory to the caller, and do not mark it to be
+    deleted when Python exits (call `tempfile.TemporaryDirectory` with
+    `delete=False`). The caller must then explicitly call the `cleanup` method
+    of the `tempfile.TemporaryDirectory` object if the temporary directory is
+    to be deleted.
+    """
+###END enum TmpDirCleanup
 
 
 class NomenclatureDefs:
@@ -96,6 +115,7 @@ class NomenclatureDefs:
     ###END NomnomenclatureDefs.__init__
 
 
+    @tp.overload
     @classmethod
     def from_url(
             cls,
@@ -105,7 +125,35 @@ class NomenclatureDefs:
             region_mappings: bool = True,
             git_revision: tp.Optional[str] = None,
             git_hash: tp.Optional[str] = None,
+            tmp_dir_cleanup: tp.Literal[TmpDirCleanup.RETURN] \
+                | tp.Literal[TmpDirCleanup.KEEP_PERMANENTLY],
+    ) -> tuple[tp.Self, tempfile.TemporaryDirectory]:
+        ...
+    @tp.overload
+    @classmethod
+    def from_url(
+            cls,
+            url: str,
+            *,
+            dimensions: Sequence[DsdDim|str],
+            region_mappings: bool = True,
+            git_revision: tp.Optional[str] = None,
+            git_hash: tp.Optional[str] = None,
+            tmp_dir_cleanup: tp.Literal[TmpDirCleanup.IMMEDIATE] \
+                = TmpDirCleanup.IMMEDIATE,
     ) -> tp.Self:
+        ...
+    @classmethod
+    def from_url(
+            cls,
+            url: str,
+            *,
+            dimensions: Sequence[DsdDim|str],
+            region_mappings: bool = True,
+            git_revision: tp.Optional[str] = None,
+            git_hash: tp.Optional[str] = None,
+            tmp_dir_cleanup: TmpDirCleanup = TmpDirCleanup.IMMEDIATE,
+    ) -> tp.Self | tuple[tp.Self, tempfile.TemporaryDirectory]:
         """Create an instance by loading from an external repository URL.
 
         Parameters
@@ -131,6 +179,20 @@ class NomenclatureDefs:
             no `/mappings` directory in the repository. If the repository does
             not have one, you *must* set this parameter to False, or an error
             will be raised.
+        tmp_dir_cleanup : TmpDirCleanup enum or str
+            Whether and how to clean up temporary directories used to hold
+            repos. Can be given as a `TmpDirCleanup` enum or a string with one
+            of the following values:
+            * `"immediate"`: Delete the temporary directory before returning.
+              This is the default.
+            * `"return"`: Do not delete the temporary directory, but return it
+              to the caller. The temporary directory will normally be deleted
+              when the Python session exits, unless its `.cleanup()` method is
+              called explicitly.
+            * `"keep_permanently"`: Do not delete the temporary directory, and
+              return it to the caller. The directory will not be deleted when
+              the Python session exits, and the user must either call its
+              `.cleanup()` method before Python exits, or delete it manually.
 
         Returns
         -------
@@ -152,8 +214,10 @@ class NomenclatureDefs:
         )
         local_dir: tempfile.TemporaryDirectory = cls.make_tmp_load_dir(
             config_content=config_yaml_content,
+            delete=not (tmp_dir_cleanup == TmpDirCleanup.KEEP_PERMANENTLY),
         )
-        with local_dir as local_dir_name:
+        local_dir_name: str = local_dir.name
+        try:
             local_path: Path = Path(local_dir_name)
             dsd: DataStructureDefinition = DataStructureDefinition(
                 local_path / _DEFINITIONS_SUBDIR_NAME, dimensions=dimensions
@@ -163,9 +227,16 @@ class NomenclatureDefs:
                     path=local_path / _MAPPINGS_SUBDIR_NAME,
                     dsd=dsd
                 )
-                return cls(dsd=dsd, region_processor=region_processor)
+                instance: tp.Self = cls(dsd=dsd, region_processor=region_processor)
             else:
-                return cls(dsd=dsd)
+                instance: tp.Self = cls(dsd=dsd)
+        except:
+            local_dir.cleanup()
+            raise
+        if tmp_dir_cleanup == TmpDirCleanup.IMMEDIATE:
+            local_dir.cleanup()
+            return instance
+        return instance, local_dir
     ###END NomnomenclatureDefs.from_url
 
 
@@ -237,6 +308,7 @@ class NomenclatureDefs:
     @staticmethod
     def make_tmp_load_dir(
             config_content: tp.Optional[str] = None,
+            delete: bool = True,
     ) -> tempfile.TemporaryDirectory:
         """Create a temporary directory to load the repository into.
 
@@ -266,8 +338,13 @@ class NomenclatureDefs:
             to ensure that its `.cleanup()` method is called to clean it up and
             delete it. It should therefore be used in `with` statements, or in
             `try`/`except`/`finally` blocks.
+        delete : bool, optional
+            Passed to `tmpfile.TemporaryDirectory`. If True, the temporary
+            directory will be deleted when the Python session ends. If False,
+            the directory will not be deleted unless the caller explicitly
+            calls `.cleanup()`. Defaults to True.
         """
-        temp_dir = tempfile.TemporaryDirectory()
+        temp_dir = tempfile.TemporaryDirectory(delete=delete)
         # Make sure the temporary directory is cleaned up if something fails
         try:
             temp_dir_path: Path = Path(temp_dir.name)
